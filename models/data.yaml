@@ -1,1 +1,14 @@
-
+names:
+- Motorbike
+- Car
+- Bus
+- Truck
+- Motorbike(night)
+- Car(night)
+- Bus(night)
+- Truck(night)
+nc: 8
+path: /kaggle/working/vietnamese_vehicle_dataset
+test: test/images
+train: train/images
+val: val/images
