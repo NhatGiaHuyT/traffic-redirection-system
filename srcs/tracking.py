@@ -108,7 +108,15 @@ def calculate_iou(boxA, boxB):
     iou = interArea / float(boxAArea + boxBArea - interArea)
     return iou
 
-def draw_tracks(frame, tracks):
+def draw_tracks(frame, tracks, unnamed=None):
+    """
+    Draw bounding boxes, class names, and speed information on the frame.
+
+    Args:
+        frame (np.array): Input frame
+        tracks (list): List of Track objects
+        unnamed (list): List of Track information
+    """
     for track in tracks:
         if not track.is_confirmed():
             continue
