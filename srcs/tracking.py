@@ -115,7 +115,7 @@ def draw_tracks(frame, tracks, unnamed: dict = None):
     Args:
         frame (np.array): Input frame
         tracks (list): List of Track objects
-        unnamed (list): List of Track information
+        unnamed (dict): Dictionary to store track information
     """
     for track in tracks:
         if not track.is_confirmed():
