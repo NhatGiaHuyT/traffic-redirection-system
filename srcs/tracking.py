@@ -108,7 +108,7 @@ def calculate_iou(boxA, boxB):
     iou = interArea / float(boxAArea + boxBArea - interArea)
     return iou
 
-def draw_tracks(frame, tracks, unnamed=None):
+def draw_tracks(frame, tracks, unnamed: dict = None):
     """
     Draw bounding boxes, class names, and speed information on the frame.
 
@@ -134,8 +134,12 @@ def draw_tracks(frame, tracks, unnamed=None):
             distance_pixels = np.linalg.norm(np.array([x1, y1]) - np.array(prev_position))
             speed_mps = distance_pixels * SCALE_FACTOR
             speed_text = f"Speed: {speed_mps:.2f} m/s"
+            if unnamed is not None:
+                unnamed[track_id]["last_position"] = [x1, y1]
         else:
             speed_text = "Speed: N/A"
+            unnamed[track_id] = {"class": class_name, "first_position": [x1, y1]}
+
         
         # Draw bounding box, class name, and speed
         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
