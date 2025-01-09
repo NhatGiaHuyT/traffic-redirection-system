@@ -18,4 +18,9 @@ This module provides tools for predicting and analyzing traffic congestion using
 - Predict and log congestion based on customizable thresholds.
 - Save processed video with visualized tracking and congestion indicators.
 
-#
+# tracking.py
+This module is responsible for vehicle detection, tracking, and class identification in video frames. It integrates YOLO for object detection and DeepSORT for tracking, providing essential functionalities for traffic monitoring and analysis:
+- Detect vehicles and classify them into predefined categories.
+- Track vehicle movements across frames using DeepSORT.
+- Compute Intersection over Union (IoU) for detection and track association.
+- Annotate video frames with bounding boxes, class names, and estimated speeds.
