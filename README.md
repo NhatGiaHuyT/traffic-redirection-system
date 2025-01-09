@@ -1,6 +1,7 @@
 # traffic-redirection-system
 
 # CHANGELOG
-## 1. Phu's first commit
+## 1. Phu 1/9/2025
 To test repository permissions, I made some modifications to the `tracking.py` file. I added an optional dictionary parameter, `unnamed`, to the draw function to store tracking object data, including the object's `class`, `first_position`, and `last_position` that the model had detected. Additionally, I created a `cluster` file to hold the unfinished `KMeansCluster` class.
-## 2. ABC
+## 2. Huy 1/9/2025
+
