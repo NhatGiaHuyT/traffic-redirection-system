@@ -11,4 +11,11 @@ This module provides a `KMeansCluster` class for clustering and visualizing trac
 - Visualize grouped paths using Matplotlib.
 - Save and load KMeans model states.
 
-# 
+# congestion_prediction.py
+This module provides tools for predicting and analyzing traffic congestion using real-time object detection, tracking, and speed estimation:
+- Detect and track vehicles in video frames using YOLO and DeepSORT.
+- Calculate average vehicle speed and density.
+- Predict and log congestion based on customizable thresholds.
+- Save processed video with visualized tracking and congestion indicators.
+
+#
