@@ -1,13 +1,13 @@
 import cv2
 import numpy as np
 from tracking import ObjectTracker
-from cluster import KMeansCluster
+from path_clusterer import PathClusterer
 
 # Initialize the tracker
 tracker = ObjectTracker(model_path="models/model_epoch_5.pt")
 
-# Parameters for clustering
-cluster = KMeansCluster(n_clusters=6)
+# Initialize PathClusterer
+cluster = PathClusterer(n_clusters=6)
 tracked_data = {}
 
 # Input and output video paths
@@ -62,17 +62,22 @@ cap.release()
 out.release()
 cv2.destroyAllWindows()
 
-# Perform clustering on tracked data
-print("Performing clustering...")
-cluster.tracked_data_ = tracked_data
-cluster.tracked_paths_2_paths_n_lines()
+# Prepare data for clustering
+paths = [np.array(path) for path in tracked_data.values()]
+print("Number of paths:", len(paths))
 
-# Use minmax range of paths as features for clustering
-features = cluster.minmax_range_paths_
-cluster.fit(features)
+# Get directions from paths
+directions = cluster.get_line_directions(paths)
+
+# Align directions for consistency
+aligned_directions = cluster.align_directions(directions)
+
+# Perform clustering
+print("Clustering paths...")
+labels = cluster.fit_and_predict(aligned_directions)
 
 # Visualize clustered paths
-clustered_paths, _ = cluster.fit(features, is_return=True)
-cluster.plot_grouped_paths(grouped_paths=clustered_paths)
+print("Visualizing clustered paths...")
+cluster.plot_grouped_paths(paths, labels, img_shape=(frame_height, frame_width))
 
 print(f"Processed video saved to {output_video_path}.")
