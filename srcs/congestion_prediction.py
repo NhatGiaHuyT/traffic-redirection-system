@@ -4,7 +4,7 @@ from tracking import ObjectTracker
 from cluster import KMeansCluster
 
 # Initialize the tracker
-tracker = ObjectTracker(model_path="model_weights.pth")
+tracker = ObjectTracker(model_path="models/model_epoch_5.pt")
 
 # Parameters for clustering
 cluster = KMeansCluster(n_clusters=6)
