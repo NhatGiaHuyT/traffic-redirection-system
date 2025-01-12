@@ -1,99 +1,78 @@
 import cv2
 import numpy as np
-from sklearn.cluster import KMeans
-from tracking import initialize_model, initialize_tracker, track_objects
+from tracking import ObjectTracker
+from cluster import KMeansCluster
 
-# Paths
-input_video_path = r"D:\Traffic Image Object Detection\vecteezy_ho-chi-minh-city-traffic-at-intersection-vietnam_1806644.mov"
-output_video_path = r"D:\Traffic Image Object Detection\output_video.mp4"
-yolo_model_path = r"D:\Traffic Image Object Detection\model\model_epoch_5.pt"  # YOLO model path
+# Initialize the tracker
+tracker = ObjectTracker(model_path="model_weights.pth")
 
-# Parameters
-lane_cluster_count = 3  # Adjust based on the number of lanes
-confidence_threshold = 0.5
-SCALE_FACTOR = 0.05  # meters per pixel (adjust to your use case)
+# Parameters for clustering
+cluster = KMeansCluster(n_clusters=6)
+tracked_data = {}
 
-# Initialize YOLO and DeepSort
-model = initialize_model(yolo_model_path)
-tracker = initialize_tracker()
+# Input and output video paths
+input_video_path = "input_video.mp4"
+output_video_path = "output_video.avi"
 
-# Process frame for lane clustering
-def cluster_lanes(tracked_objects, frame_width):
-    centroids = []
-    for obj in tracked_objects:
-        bbox = obj['bbox']
-        x1, y1, x2, y2 = map(int, bbox)
-        cx = (x1 + x2) // 2  # Get centroid x-coordinate
-        centroids.append([cx])
+# Open the video file
+cap = cv2.VideoCapture(input_video_path)
 
-    # Perform clustering
-    kmeans = KMeans(n_clusters=lane_cluster_count, random_state=42)
-    cluster_labels = kmeans.fit_predict(centroids)
+if not cap.isOpened():
+    print("Error: Could not open video.")
+    exit()
 
-    # Assign each object to a lane
-    lane_assignments = {}
-    for idx, obj in enumerate(tracked_objects):
-        lane_assignments[obj['id']] = cluster_labels[idx]
+# Get video properties
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
 
-    return lane_assignments, kmeans.cluster_centers_
+# Video writer to save output
+fourcc = cv2.VideoWriter_fourcc(*'XVID')
+out = cv2.VideoWriter(output_video_path, fourcc, frame_rate, (frame_width, frame_height))
 
-# Detect congestion
-def detect_congestion(lane_assignments):
-    lane_counts = {}
-    for lane in lane_assignments.values():
-        lane_counts[lane] = lane_counts.get(lane, 0) + 1
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
 
-    congested_lanes = [lane for lane, count in lane_counts.items() if count > 5]  # Threshold for congestion
-    return congested_lanes
+    # Track objects in the current frame
+    detections = tracker.process_frame(frame)
 
-# Process video
-def process_video(input_path, output_path):
-    cap = cv2.VideoCapture(input_path)
-    if not cap.isOpened():
-        print("Error: Unable to open input video.")
-        return
+    for det in detections:
+        x1, y1, x2, y2, obj_id = det
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+        # Update tracked data
+        if obj_id not in tracked_data:
+            tracked_data[obj_id] = []
+        tracked_data[obj_id].append(((x1 + x2) // 2, (y1 + y2) // 2))
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+        # Draw bounding boxes and object IDs on the frame
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+        cv2.putText(frame, f"ID: {obj_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-        # Track objects
-        tracked_objects = track_objects(frame, model, tracker, confidence_threshold)
+    # Write the frame to the output video
+    out.write(frame)
 
-        # Cluster lanes
-        lane_assignments, lane_centers = cluster_lanes(tracked_objects, frame_width)
+    # Display the frame (optional)
+    cv2.imshow("Tracking", frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-        # Detect congestion
-        congested_lanes = detect_congestion(lane_assignments)
+cap.release()
+out.release()
+cv2.destroyAllWindows()
 
-        # Annotate frame
-        for obj in tracked_objects:
-            track_id = obj['id']
-            bbox = obj['bbox']
-            lane = lane_assignments[track_id]
-            x1, y1, x2, y2 = map(int, bbox)
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f"ID: {track_id} Lane: {lane}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+# Perform clustering on tracked data
+print("Performing clustering...")
+cluster.tracked_data_ = tracked_data
+cluster.tracked_paths_2_paths_n_lines()
 
-        for idx, center in enumerate(lane_centers):
-            cv2.line(frame, (int(center[0]), 0), (int(center[0]), frame_height), (255, 0, 0), 2)
-            cv2.putText(frame, f"Lane {idx}", (int(center[0]), 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+# Use minmax range of paths as features for clustering
+features = cluster.minmax_range_paths_
+cluster.fit(features)
 
-        for lane in congested_lanes:
-            cv2.putText(frame, f"Congested Lane: {lane}", (10, 50 + lane * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+# Visualize clustered paths
+clustered_paths, _ = cluster.fit(features, is_return=True)
+cluster.plot_grouped_paths(grouped_paths=clustered_paths)
 
-        out.write(frame)
-
-    cap.release()
-    out.release()
-    print("Video processing complete. Output saved to:", output_path)
-
-if __name__ == "__main__":
-    process_video(input_video_path, output_video_path)
+print(f"Processed video saved to {output_video_path}.")
