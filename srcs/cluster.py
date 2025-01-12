@@ -1,234 +1,133 @@
+import numpy as np
+from sklearn.cluster import KMeans
 import cv2
 import pickle
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 
-RANDOM_STATE = 42
-np.random.seed(RANDOM_STATE)
-
-class KMeansCluster:
-    def __init__(self, tracked_data : dict = None, 
-                 data_file:str = "tracked_data.pkl", 
-                 n_clusters=6, camera_id = None):
+class PathClusterer:
+    def __init__(self, n_clusters=2, random_state=42):
         """
-        Initialize the object.
+        Initializes the PathClusterer with the number of clusters and random state.
 
-        Args:
-            - tracked_data (dict) : The tracked data `{object_id: [((x1, y1), v1), ((x2, y2), v2), ...]}`.
-            - data_file (str) : The filename of the data file.
-            - n_clusters (int) : The number of clusters.
-            - camera_id (int) : The camera id.
+        Parameters:
+            n_clusters (int): Number of clusters to form.
+            random_state (int): Random state for reproducibility.
         """
-        
-        if tracked_data is None and data_file is None:
-            raise ValueError("You must provide either the tracked data or the data file")
-        
-        self.n_clusters_ = n_clusters
-        self.id_ = camera_id
-        self.colors_ = [
-                'b',     # Blue
-                'g',     # Green
-                'r',     # Red
-                'c',     # Cyan
-                'm',     # Magenta
-                'y',     # Yellow
-                # 'k',     # Black
-                # 'w',     # White
-                'orange',
-                'purple',
-                'pink',
-                'brown',
-                'gray',
-                'lightblue',
-                'lightgreen',
-                'lightcoral',
-                'gold',
-                'navy',
-                'teal',
-                'lime',
-                'violet',
-                'indigo',
-                'maroon',
-                'olive',
-                'chocolate',
-                'salmon',
-                'khaki',
-                'plum',
-                'slategray',
-                'coral',
-                'darkgreen',
-                'darkblue',
-                'tan',
-                'crimson',
-                'steelblue',
-                'sandybrown',
-                'springgreen',
-                'aqua',
-                'fuchsia',
-                'lavender',
-                'seashell',
-                'forestgreen',
-                'royalblue',
-                'powderblue',
-                'honeydew',
-                'peachpuff',
-                'chartreuse',
-                'palevioletred'
-            ]
-        self.kmeans_ = KMeans(n_clusters=self.n_clusters_, random_state=RANDOM_STATE)
-        self.tracked_data_ = tracked_data or self.read_tracked_paths(data_file)
-        self.data_size_ = len(self.tracked_data_)
-        self.tracked_paths_2_paths_n_lines()
+        self.n_clusters = n_clusters
+        self.random_state = random_state
+        self.kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
 
-
-
-    def read_tracked_paths(self, filename:str) -> dict:
+    def fit(self, features):
         """
-        Read the tracked data from the data file
+        Fits the KMeans model to the provided features.
 
-        Args:
-        filename: str
-            The filename of the data file
-
-        Returns:
-        tracked_data: dict
-            The accumulated tracking data `{object_id: [((x1, y1), v1), ((x2, y2), v2), ...]}`
+        Parameters:
+            features (ndarray): Array of feature vectors.
         """
-        with open(filename, "rb") as f:
-            tracked_data = pickle.load(f)
-        
-        return tracked_data 
-    
-    def tracked_paths_2_paths_n_lines(self):
-        """
-        Convert the tracked data to paths and lines
-        """
-        paths = []
-        lines = []
-        for value in self.tracked_data_.values():
-            path = [point for point, _ in value]
-            paths.append(np.array(path))
+        self.kmeans.fit(features)
 
-            fitted_line = cv2.fitLine(path, cv2.DIST_L2, 0, 0.01, 0.01) # vx, vy, x0, y0
-            if np.dot(fitted_line[:2].flatten(), path[-1] - path[0]) < 0: # If the direction vector is opposite to the path
-                    fitted_line[:2] *= -1
-            lines.append(fitted_line.flatten())
-
-        self.paths_ = paths
-        self.minmax_range_paths_ = np.array([path.max(axis=0) - path.min(axis=0) for path in paths])
-        self.lines_ = lines
-    
-    def get_line_intersection(self, line, point):
-        """
-        Get the intersection point of the line and an external point.
-        """
-        vx, vy, x0, y0 = line[:4]
-        xp, yp = point
-        t = -((vx * (x0 - xp)) + (vy * (y0 - yp))) / (vx**2 + vy**2)
-        pos_c = x0 + t * vx, y0 + t * vy
-
-        return pos_c
-
-    def plot_vector(self, dv, point=None, color='b', t: int = 100):
-        """
-        Plot the direction vector.
-
-        Args:
-            - dv (array-like) : The direction vector.
-            - point (array-like) : The external point.
-            - color (str) : The color of the vector.
-            - t (int) : The length of the vector.
-        """
-        vx, vy, x0, y0 = dv[:4]
-        if point is not None:
-            x1, y1 = self.get_line_intersection(dv, point)
-            plt.quiver(x0, y0, x1 - x0, y1 - y0, angles='xy', scale_units='xy', scale=1, color=color)
-        else:
-            plt.quiver(x0, y0, x0 + t*vx, y0 + t*vy, angles='xy', scale_units='xy', scale=1, color=color)
-
-
-
-    def fit(self, features, is_return: bool = False):
-        """
-        Fitting the feature vectors to the KMeans model and group the paths and lines via the labels.
-
-        Args:
-            - features (array-like) : The feature vectors.
-            - is_return (bool) : Whether to return the grouped paths and lines.
-
-        Returns:
-            - grouped_paths (dict) : The grouped paths by the direction of the lines.
-            - grouped_lines (dict) : The grouped lines by the direction of the lines.
-        """
-        self.kmeans_.fit(features.copy())
-        
-        if not is_return:
-            return
-        """Group the paths by the direction of the lines"""
-        grouped_paths = dict()
-        grouped_lines = dict()
-        for i in range(self.n_clusters_):
-            grouped_paths[i] = []
-            grouped_lines[i] = []
-            for j, line in enumerate(self.lines_):
-                if self.kmeans_.labels_[j] == i:
-                    grouped_paths[i].apped(self.paths_[j])
-                    grouped_lines[i].append(line)
-
-        return grouped_paths, grouped_lines
-                
-    
     def predict(self, features):
         """
-        Predict the labels of the feature vectors.
+        Predicts the cluster labels for the provided features.
 
-        Args:
-            - features (array-like) : The feature vectors.
+        Parameters:
+            features (ndarray): Array of feature vectors.
 
         Returns:
-            - labels (array-like) : The predicted labels.
+            ndarray: Cluster labels for each feature vector.
         """
-        return self.kmeans_.predict(features)
-    
-    def plot_grouped_paths(self, grouped_paths=None, figsize=(12, 8), img_shape=(1080, 1920)):
-        """
-        Plot the grouped paths.
+        return self.kmeans.predict(features)
 
-        Args:
-            - grouped_paths (dict) : The grouped paths by the direction of the lines.
-            - figsize (tuple) : The output figure size.
-            - img_shape (tuple) : The shape of the image.
+    def fit_and_predict(self, features):
         """
-        if grouped_paths is None:
-            grouped_paths = self.grouped_paths_
-        
-        plt.figure(figsize=figsize)
-        for i, paths in grouped_paths.items():
-            for path in paths:
-                plt.plot(path[:, 0], path[:, 1], self.colors_[i % len(self.colors_)])
-                plt.plot(path[-1, 0], path[-1, 1], 'v', color=self.colors_[i % len(self.colors_)])
-        plt.xlim(0, img_shape[1])
-        plt.ylim(img_shape[0], 0)
-        plt.gca().set_aspect('equal', adjustable='box')
-        plt.show()
-    
+        Fits the KMeans model and predicts cluster labels in one step.
+
+        Parameters:
+            features (ndarray): Array of feature vectors.
+
+        Returns:
+            ndarray: Cluster labels for each feature vector.
+        """
+        self.fit(features)
+        return self.predict(features)
+
+    def get_line_directions(self, paths):
+        """
+        Computes direction vectors for each path using linear fitting.
+
+        Parameters:
+            paths (list of ndarray): List of paths, where each path is an array of (x, y) points.
+
+        Returns:
+            ndarray: Array of normalized direction vectors.
+        """
+        directions = []
+        for path in paths:
+            if len(path) < 2:
+                continue
+            [vx, vy, _, _] = cv2.fitLine(np.array(path, dtype=np.float32), cv2.DIST_L2, 0, 0.01, 0.01)
+            direction = np.array([vx[0], vy[0]])
+            norm = np.linalg.norm(direction)
+            if norm == 0:
+                continue
+            direction /= norm
+            directions.append(direction)
+        return np.array(directions)
+
+    def align_directions(self, directions):
+        """
+        Aligns direction vectors to ensure consistent orientation.
+
+        Parameters:
+            directions (ndarray): Array of direction vectors.
+
+        Returns:
+            ndarray: Array of aligned direction vectors.
+        """
+        aligned = []
+        for dir_vec in directions:
+            if np.dot(dir_vec, np.array([1, 0])) < 0:
+                dir_vec = -dir_vec
+            aligned.append(dir_vec)
+        return np.array(aligned)
+
     def save(self, filename):
         """
-        Save the KMeans model to the file.
+        Saves the KMeans model to a file.
 
-        Args:
-            - filename (str) : The filename of the file.
+        Parameters:
+            filename (str): Path to the file where the model will be saved.
         """
         with open(filename, 'wb') as f:
-            pickle.dump(self.kmeans_, f)
-    
+            pickle.dump(self.kmeans, f)
+
     def load(self, filename):
         """
-        Load the KMeans model from the file.
+        Loads the KMeans model from a file.
 
-        Args:
-            - filename (str) : The filename of the cluster parameters.
+        Parameters:
+            filename (str): Path to the file containing the saved model.
         """
         with open(filename, 'rb') as f:
-            self.kmeans_ = pickle.load(f)
+            self.kmeans = pickle.load(f)
+
+    def plot_grouped_paths(self, paths, labels, img_shape=(500, 500)):
+        """
+        Visualizes clustered paths on an image.
+
+        Parameters:
+            paths (list of ndarray): List of paths, where each path is an array of (x, y) points.
+            labels (ndarray): Cluster labels for each path.
+            img_shape (tuple): Shape of the output image (height, width).
+        """
+        colors = plt.cm.get_cmap('tab10', self.n_clusters)
+        img = np.ones((img_shape[0], img_shape[1], 3), dtype=np.uint8) * 255
+        for i, path in enumerate(paths):
+            if len(path) < 2:
+                continue
+            color = tuple((np.array(colors(labels[i]))[:3] * 255).astype(int))
+            for j in range(len(path) - 1):
+                cv2.line(img, tuple(path[j]), tuple(path[j + 1]), color, 2)
+        plt.imshow(img)
+        plt.axis('off')
+        plt.show()
