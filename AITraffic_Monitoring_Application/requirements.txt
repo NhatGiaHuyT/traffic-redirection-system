@@ -1,0 +1,11 @@
+streamlit
+folium
+streamlit-folium
+pandas
+numpy
+requests
+streamlit-lottie
+matplotlib
+opencv-python-headless
+torch
+ultralytics
