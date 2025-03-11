@@ -1,0 +1,20 @@
+# Ignore some folders of AITraffic_Monitoring_Application
+/AITraffic_Monitoring_Application/venv/
+env/
+
+
+# Ignore video files in AITraffic_Monitoring_Application
+/AITraffic_Monitoring_Application/*.mp4
+/AITraffic_Monitoring_Application/*.avi
+/AITraffic_Monitoring_Application/*.mov
+
+# Ignore build output
+dist/
+build/
+
+# Ignore environment variables
+.env
+
+# Ignore IDE specific files
+.vscode/
+.idea/
