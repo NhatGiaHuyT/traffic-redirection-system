@@ -1,505 +1,338 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+import cv2
+import torch
 import numpy as np
+import warnings
+import base64
 import time
-import random
+import pandas as pd
+import matplotlib.pyplot as plt
 
-################################################################################
-#                                 INTRO & STYLES                                #
-################################################################################
+# Suppress warnings
+warnings.filterwarnings("ignore")
 
-"""
-This file defines a single-container Streamlit application that simulates
-a traffic intersection with four roads (A, B, C, D). Each road can spawn
-vehicles based on a Poisson-like process derived from a user-defined
-"vehicles per minute" rate. The intersection logic uses green times
-defined by "green, yellow, red" intervals for each road, and the simulation
-progresses in real time, updating the display once per second.
+# ------------------------- TRACKING & SPEED CALCULATION CODE -------------------------
+import os
+import datetime
+import logging
+from collections import defaultdict
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from ultralytics import YOLO  # For consistency, we assume your YOLO model interface is similar
 
-Key design goals:
-  1) A single background (white), no fancy layered images. 
-  2) Only one figure displayed each frame, ensuring no stacking or leftover visuals.
-  3) A "Continuous Animation" loop that updates the figure in place.
-  4) Over 500 lines of code to allow for extensive commentary, clarity, and future extensibility.
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-You can tweak the refresh interval, the speeds, the volumes, etc. 
-"""
+# Define a scaling factor for speed calculation (adjust this based on your video and measurement units)
+SCALE_FACTOR = 0.05  # meters per pixel, you might need to adjust this
+
+# Class ID to class name mapping (for tracking code)
+class_names = ['Motorbike', 'Car', 'Bus', 'Truck', 'Motorbike(night)', 'Car(night)', 'Bus(night)', 'Truck(night)']
+
+# Track ID to class name mapping (global dictionary)
+track_class_map = {}
+
+def calculate_iou(boxA, boxB):
+    # Convert track bbox (ltrb) to xywh
+    boxA = [boxA[0], boxA[1], boxA[2] - boxA[0], boxA[3] - boxA[1]]
+    xA, yA, wA, hA = boxA
+    xB, yB, wB, hB = boxB
+
+    # Compute the intersection
+    x1 = max(xA, xB)
+    y1 = max(yA, yB)
+    x2 = min(xA + wA, xB + wB)
+    y2 = min(yA + hA, yB + hB)
+    
+    if x2 < x1 or y2 < y1:
+        return 0.0  # No overlap
+    
+    interArea = (x2 - x1) * (y2 - y1)
+    boxAArea = wA * hA
+    boxBArea = wB * hB
+    iou = interArea / float(boxAArea + boxBArea - interArea)
+    return iou
+
+def process_frame(frame, model, tracker):
+    results = model(frame)
+    # If results is a list, get the first result.
+    if isinstance(results, list):
+        results = results[0]
+    detections = []
+    
+    # Iterate over each detection in results.boxes.data
+    for det in results.boxes.data:
+        # Each detection row is: [x1, y1, x2, y2, confidence, class]
+        x1, y1, x2, y2, conf, cls = det.tolist()
+        if conf < 0.5:
+            continue
+        # Convert coordinates to int
+        x1, y1, x2, y2 = map(int, (x1, y1, x2, y2))
+        class_name = model.names[int(cls)]
+        detections.append([[x1, y1, x2 - x1, y2 - y1], float(conf), int(cls), class_name])
+    
+    tracks = tracker.update_tracks(detections, frame=frame)
+    
+    # Associate tracks with detections based on IoU
+    for track in tracks:
+        if not track.is_confirmed():
+            continue
+        track_bbox = track.to_ltrb()  # (left, top, right, bottom)
+        best_match = None
+        best_iou = 0
+        for detection in detections:
+            detection_bbox = detection[0]
+            iou = calculate_iou(track_bbox, detection_bbox)
+            if iou > best_iou:
+                best_iou = iou
+                best_match = detection
+        if best_match and best_iou > 0.3:
+            track_class_map[track.track_id] = best_match[3]
+    return tracks
 
 
-# We set a white background so that no layering or transparency occurs.
-CUSTOM_CSS = """
-<style>
-/* Force a single white background for the entire app */
-.stApp {
-    background: #FFFFFF !important;
-}
-
-/* Header styling */
-.title h1 {
-    font-size: 3em;
-    color: #333333;
-    text-align: center;
-    margin-bottom: 0.2em;
-}
-
-/* Sidebar styling */
-.sidebar .sidebar-content {
-    font-size: 16px;
-}
-
-/* Card styling for result info */
-.traffic-card {
-    background-color: #f8f8f8;
-    border-radius: 15px;
-    padding: 15px;
-    margin: 8px 0;
-    box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-.traffic-card:hover {
-    transform: scale(1.03);
-    box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
-}
-.active-road {
-    border: 2px solid #33aa33;
-    background-color: #e0ffe0 !important;
-}
-</style>
-"""
-
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-# We set a wide layout so we can show both intersection & chart side by side
-st.set_page_config(page_title="Smooth Single-Container Traffic Simulation", layout="wide")
-
-################################################################################
-#                               GLOBAL CONSTANTS                               #
-################################################################################
-
-# Basic geometry / speeds
-MAX_DISTANCE = 100.0           # Max distance along each road
-ROAD_WIDTH = 10                # Road width for the intersection
-REFRESH_INTERVAL = 1.0         # Each simulation step is 1 second
-BASE_SPEED = 20.0              # Vehicles move 20 distance units per second
-VEHICLE_LENGTH = 4.0           # Vehicle rectangle length
-VEHICLE_WIDTH = 2.0            # Vehicle rectangle width
-
-# Simulation duration
-SIM_DURATION = 300             # Maximum simulation time (seconds)
-TIME_SCALE = 1.0               # Not used in detail, but could scale dt if needed
-
-################################################################################
-#                             SESSION STATE INIT                               #
-################################################################################
-
-if "sim_running" not in st.session_state:
-    st.session_state.sim_running = False
-if "sim_time" not in st.session_state:
-    st.session_state.sim_time = 0.0  # Clock for the simulation
-if "current_road_index" not in st.session_state:
-    st.session_state.current_road_index = 0
-if "remaining_green_time" not in st.session_state:
-    st.session_state.remaining_green_time = 0.0
-if "vehicle_positions" not in st.session_state:
-    st.session_state.vehicle_positions = {
-        "Road A": [],
-        "Road B": [],
-        "Road C": [],
-        "Road D": []
-    }
-if "traffic_volumes" not in st.session_state:
-    # vehicles per minute on each road
-    st.session_state.traffic_volumes = [30, 30, 30, 30]
-if "timings" not in st.session_state:
-    # (green, yellow, red) in seconds for each road
-    st.session_state.timings = [(15, 4, 6)] * 4
-if "weather_condition" not in st.session_state:
-    st.session_state.weather_condition = "clear"
-if "road_condition" not in st.session_state:
-    st.session_state.road_condition = "Normal"
-
-directions = ["Road A", "Road B", "Road C", "Road D"]
-
-################################################################################
-#                           HEADER & SIDEBAR NAVIGATION                        #
-################################################################################
-
-st.sidebar.markdown("## Navigation")
-if st.sidebar.button("Home"):
-    st.session_state.page = "home"
-
-st.markdown("<div class='title'><h1>🚦 Single-Container Traffic Simulation 🚦</h1></div>", 
-            unsafe_allow_html=True)
-
-################################################################################
-#                       SIMULATION HELPER FUNCTIONS                            #
-################################################################################
-
-def adjust_for_weather(volumes, condition):
+def draw_tracks(frame, tracks, track_info: dict):
     """
-    Adjust traffic volumes based on weather conditions.
-    E.g. rainy => multiply by 1.8, foggy => multiply by 1.5
+    Draw bounding boxes, class names, and speed information on the frame.
+    Uses track.prev_position to compute speed.
     """
-    adjusted = volumes.copy()
-    if condition == "rainy":
-        adjusted = [v * 1.8 for v in adjusted]
-    elif condition == "foggy":
-        adjusted = [v * 1.5 for v in adjusted]
-    return adjusted
+    for track in tracks:
+        if not track.is_confirmed():
+            continue
+        
+        track_id = track.track_id
+        ltrb = track.to_ltrb()
+        x1, y1, x2, y2 = map(int, ltrb)
 
-def calculate_timings(volumes, scenario, weather, closed=None, incident=None, priority=None):
-    """
-    Calculate (green, yellow, red) timings for each road based on volumes,
-    scenario, weather, etc.
-    """
-    base_green = 15
-    base_yellow = 4
-    base_red = 6
-    out = []
-    for i, vol in enumerate(volumes):
-        green = base_green + int(vol / 30)
-        yellow = base_yellow + int(vol / 50)
-        red = base_red + int(vol / 60)
-        if weather == "rainy":
-            yellow += 2
-        if weather == "foggy":
-            red += 2
-        if scenario == "Emergency Response":
-            if i == priority:
-                green = int(green * 1.5)
-            else:
-                green = int(green * 0.8)
-                red = int(red * 0.7)
-        elif scenario == "Road Closure" and i == closed:
-            green, yellow, red = 0, 0, 0
-        elif scenario in ["Traffic Incident", "Construction Zone"] and i == incident:
-            factor = 1.5 if scenario == "Traffic Incident" else 1.2
-            green = int(green * factor)
-        out.append((green, yellow, red))
-    return out
+        # Get the class name from the track_class_map
+        class_name = track_class_map.get(track_id, 'Unknown')
 
-def spawn_vehicles(volumes, dt):
-    """
-    Spawn new vehicles on each road based on volumes (veh/min).
-    Poisson-like process => probability = (volume/60)*dt
-    """
-    for i, road in enumerate(directions):
-        rate = volumes[i] / 60.0
-        if random.random() < rate * dt:
-            st.session_state.vehicle_positions[road].append(0.0)
-
-def move_vehicles(dt):
-    """
-    Move vehicles on the active road forward by BASE_SPEED * dt.
-    """
-    step = BASE_SPEED * dt
-    active_road = directions[st.session_state.current_road_index]
-    for road in directions:
-        new_positions = []
-        for pos in st.session_state.vehicle_positions[road]:
-            if road == active_road:
-                pos += step
-            if pos <= MAX_DISTANCE:
-                new_positions.append(pos)
-        st.session_state.vehicle_positions[road] = new_positions
-
-def run_simulation_step(dt):
-    """
-    Advance the simulation by dt seconds:
-      - If green time is done, switch roads
-      - Decrease traffic volume on the active road
-      - Spawn & move vehicles
-      - Increment sim_time
-    """
-    if not st.session_state.timings:
-        return
-    idx = st.session_state.current_road_index
-    if st.session_state.remaining_green_time <= 0:
-        # Start a new phase
-        st.session_state.remaining_green_time = st.session_state.timings[idx][0]
-    st.session_state.remaining_green_time -= dt
-
-    # Vehicle departure from active road
-    leave_rate = 1.0  # vehicles/sec
-    st.session_state.traffic_volumes[idx] = max(
-        st.session_state.traffic_volumes[idx] - (leave_rate * dt), 0
-    )
-
-    # Spawn & move
-    spawn_vehicles(st.session_state.traffic_volumes, dt)
-    move_vehicles(dt)
-
-    # If green ended, switch to next road
-    if st.session_state.remaining_green_time <= 0:
-        st.session_state.current_road_index = (idx + 1) % len(directions)
-
-    st.session_state.sim_time += dt
-
-def reset_simulation(settings):
-    """
-    Reset simulation with new volumes, timings, etc.
-    """
-    st.session_state.traffic_volumes = settings["volumes"]
-    st.session_state.timings = calculate_timings(
-        st.session_state.traffic_volumes,
-        scenario=settings["road_condition"],
-        weather=settings["weather_condition"],
-        closed=settings["closed_road"],
-        incident=settings["affected_road"],
-        priority=settings["affected_road"]
-    )
-    st.session_state.sim_time = 0.0
-    st.session_state.current_road_index = 0
-    st.session_state.remaining_green_time = 0.0
-    st.session_state.vehicle_positions = {d: [] for d in directions}
-    st.session_state.sim_running = False
-
-################################################################################
-#                       VISUALIZATION (SINGLE FIGURE)                          #
-################################################################################
-
-def draw_vehicle(ax, x, y, orientation, color):
-    """
-    Draw a vehicle as a rectangle on the given axis.
-    orientation: "horizontal" or "vertical"
-    """
-    if orientation == "horizontal":
-        rect = patches.Rectangle((x, y - VEHICLE_WIDTH/2), VEHICLE_LENGTH, VEHICLE_WIDTH,
-                                 facecolor=color, edgecolor='black')
-        ax.add_patch(rect)
-    elif orientation == "vertical":
-        rect = patches.Rectangle((x - VEHICLE_WIDTH/2, y - VEHICLE_LENGTH), VEHICLE_WIDTH, VEHICLE_LENGTH,
-                                 facecolor=color, edgecolor='black')
-        ax.add_patch(rect)
-
-def draw_single_figure():
-    """
-    Create one figure with two subplots side by side:
-      1) Intersection with roads & vehicles
-      2) Bar chart of traffic volumes
-    Return the figure object to be displayed in the single placeholder.
-    """
-    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12,6))
-    fig.subplots_adjust(wspace=0.3)
-
-    # Force white backgrounds to avoid transparency
-    fig.patch.set_facecolor('white')
-    ax1.set_facecolor('white')
-    ax2.set_facecolor('white')
-
-    # -- Intersection on ax1 --
-    color_active = "#c5f7c5"
-    color_inactive = "#dddddd"
-
-    # Road A
-    cA = color_active if st.session_state.current_road_index == 0 else color_inactive
-    ax1.add_patch(patches.Rectangle((0, 45), 50, ROAD_WIDTH, color=cA))
-    # Road B
-    cB = color_active if st.session_state.current_road_index == 1 else color_inactive
-    ax1.add_patch(patches.Rectangle((45, 0), ROAD_WIDTH, 50, color=cB))
-    # Road C
-    cC = color_active if st.session_state.current_road_index == 2 else color_inactive
-    ax1.add_patch(patches.Rectangle((50, 45), 50, ROAD_WIDTH, color=cC))
-    # Road D
-    cD = color_active if st.session_state.current_road_index == 3 else color_inactive
-    ax1.add_patch(patches.Rectangle((45, 50), ROAD_WIDTH, 50, color=cD))
-
-    # Draw vehicles
-    for road in directions:
-        positions = st.session_state.vehicle_positions[road]
-        for pos in positions:
-            if road == "Road A":
-                draw_vehicle(ax1, x=pos, y=50, orientation="horizontal", color="red")
-            elif road == "Road B":
-                draw_vehicle(ax1, x=50, y=pos, orientation="vertical", color="blue")
-            elif road == "Road C":
-                draw_vehicle(ax1, x=MAX_DISTANCE - pos, y=50, orientation="horizontal", color="green")
-            elif road == "Road D":
-                draw_vehicle(ax1, x=50, y=MAX_DISTANCE - pos, orientation="vertical", color="orange")
-
-    ax1.set_xlim(0, MAX_DISTANCE)
-    ax1.set_ylim(0, MAX_DISTANCE)
-    ax1.set_aspect('equal')
-    ax1.axis('off')
-    ax1.set_title("Intersection", fontsize=14, fontweight='bold')
-
-    # -- Traffic volumes on ax2 --
-    volumes = st.session_state.traffic_volumes
-    colors = ["green" if v < 20 else "orange" if v < 40 else "red" for v in volumes]
-    ax2.bar(directions, volumes, color=colors)
-    ax2.set_title("Traffic Volumes", fontsize=14, fontweight='bold')
-    ax2.set_xlabel("Road", fontsize=12)
-    ax2.set_ylabel("Volume (veh/min)", fontsize=12)
-    ax2.grid(axis='y', linestyle='--', alpha=0.7)
-
-    return fig
-
-def display_result_cards():
-    """
-    Display road info in cards sorted by volume descending. 
-    The active road is highlighted.
-    """
-    sorted_data = sorted(
-        zip(directions, st.session_state.traffic_volumes, st.session_state.timings, range(len(directions))),
-        key=lambda x: x[1],
-        reverse=True
-    )
-    for direction, volume, timing, idx in sorted_data:
-        card_class = "traffic-card"
-        if idx == st.session_state.current_road_index:
-            card_class += " active-road"
-        green, yellow, red = timing
-        st.markdown(f"""
-        <div class="{card_class}">
-            <h2 style="text-align:center;">{direction}</h2>
-            <p style="text-align:center;">Volume: <strong>{int(volume)}</strong> veh/min</p>
-            <p style="text-align:center;">Green: <strong>{green:.1f}s</strong></p>
-            <p style="text-align:center;">Yellow: <strong>{yellow:.1f}s</strong></p>
-            <p style="text-align:center;">Red: <strong>{red:.1f}s</strong></p>
-        </div>
-        """, unsafe_allow_html=True)
-
-################################################################################
-#                          SIDEBAR USER SETTINGS                               #
-################################################################################
-
-st.sidebar.header("Simulation Settings")
-
-weather = st.sidebar.selectbox("Select Weather Condition", ["clear", "rainy", "foggy"])
-st.session_state.weather_condition = weather
-
-road_cond = st.sidebar.selectbox(
-    "Select Road Condition",
-    ["Normal", "Road Closure", "Traffic Incident", "Construction Zone", "Emergency Response"]
-)
-st.session_state.road_condition = road_cond
-
-traffic_input = []
-closed_road = None
-affected_road = None
-
-if road_cond == "Normal":
-    for d in directions:
-        tv = st.sidebar.number_input(f"Traffic volume for {d} (veh/min):", min_value=0, value=30, step=1)
-        traffic_input.append(tv)
-elif road_cond == "Road Closure":
-    closed_road = st.sidebar.selectbox("Select Road to Close", directions)
-    for d in directions:
-        if d == closed_road:
-            traffic_input.append(0)
+        # Calculate speed if previous position exists
+        if hasattr(track, 'prev_position'):
+            prev_position = track.prev_position
+            distance_pixels = np.linalg.norm(np.array([x1, y1]) - np.array(prev_position))
+            speed_mps = distance_pixels * SCALE_FACTOR
+            speed_text = f"Speed: {speed_mps:.2f} m/s"
+            # Update stored position
+            track.prev_position = [x1, y1]
         else:
-            tv = st.sidebar.number_input(f"Traffic volume for {d} (veh/min):", min_value=0, value=30, step=1)
-            traffic_input.append(tv)
-else:
-    affected_road = st.sidebar.selectbox("Select Affected Road", directions)
-    for d in directions:
-        tv = st.sidebar.number_input(f"Traffic volume for {d} (veh/min):", min_value=0, value=30, step=1)
-        if d == affected_road:
-            if road_cond == "Traffic Incident":
-                tv = int(tv * 1.5)
-            elif road_cond == "Construction Zone":
-                tv = int(tv * 1.3)
-        traffic_input.append(tv)
+            speed_text = "Speed: N/A"
+            track.prev_position = [x1, y1]
 
-adjusted_volumes = adjust_for_weather(traffic_input, weather)
+        # Draw bounding box, track id, class name, and speed
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(frame, f"ID: {track_id}", (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        cv2.putText(frame, class_name, (x1, y1 - 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(frame, speed_text, (x1, y1 - 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    return frame
 
-settings = {
-    "volumes": adjusted_volumes,
-    "weather_condition": weather,
-    "road_condition": road_cond,
-    "closed_road": closed_road,
-    "affected_road": affected_road
+# ------------------------- END TRACKING CODE -------------------------
+
+# Load the YOLOv5 model (ensure YOLOv5 is already installed)
+# We keep your original model loading for video processing.
+model = YOLO(r'model_epoch_5.pt')
+
+# For tracking, we initialize a DeepSort tracker.
+tracker = DeepSort(max_age=30, n_init=3, nn_budget=100)
+# Dictionary to store per-track information (if needed for additional calculations)
+track_info = {}
+
+# Function to analyze traffic density (count vehicles) using original detections
+def analyze_traffic_density(detections):
+    vehicle_classes = ['car', 'truck', 'bus', 'motorcycle']  # Define vehicle classes to count
+    vehicle_count = {cls: 0 for cls in vehicle_classes}  # Initialize count for each vehicle class
+    for index, row in detections.iterrows():
+        detected_class = model.names[int(row['class'])]  # Get the detected class name
+        if detected_class in vehicle_classes:
+            vehicle_count[detected_class] += 1
+    return vehicle_count
+
+# Function to classify congestion based on total vehicle count
+def get_congestion_level(total_vehicle_count):
+    if total_vehicle_count > 20:
+        return 'Heavy'
+    elif 10 <= total_vehicle_count <= 20:
+        return 'Medium'
+    else:
+        return 'Light'
+
+def display_congestion_notification(congestion_class):
+    colors = {
+        'Heavy': ('rgba(255, 0, 0, 0.5)', 'red'),
+        'Medium': ('rgba(255, 165, 0, 0.5)', 'orange'),
+        'Light': ('rgba(0, 255, 0, 0.5)', 'green'),
+    }
+    bg_color, border_color = colors.get(congestion_class, ('rgba(0, 0, 0, 0.5)', 'black'))
+    congestion_placeholder.markdown(
+        f"""
+        <div style="background-color: {bg_color}; border: 2px solid {border_color}; border-radius: 10px; padding: 10px; text-align: center;">
+            <strong style="color: black; font-size: 20px;">{congestion_class} Congestion Detected!</strong>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Streamlit application header
+st.markdown(
+    """
+    <h1 style='text-align: center; color: black; white-space: nowrap;'>See Traffic Feed</h1>
+    """,
+    unsafe_allow_html=True
+)
+
+# Back button
+if st.button("Back", key='back_button'):
+    st.session_state.page = 'home'
+
+st.markdown(
+    """
+    <style>
+    .stSelectbox label {
+        color: black;
+        font-weight: bold;
+        font-size: 18px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Function to set background image using base64 encoding
+def set_background(image_path):
+    with open(image_path, "rb") as f:
+        img_data = f.read()
+    encoded_image = base64.b64encode(img_data).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url(data:image/png;base64,{encoded_image});
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Set the background image path (unchanged)
+background_image = r"1.jpg"
+set_background(background_image)
+
+# Dropdown for selecting the video file (directories unchanged)
+video_options = {
+    "Camera System 1": r"Traffic.mp4",
+    "Camera System 2": r"Traffic2.mp4",
+    "Camera System 3": r"Traffic3.mp4",
+    "Camera System 4": r"Traffic4.mp4",
 }
 
-if st.sidebar.button("Apply Settings"):
-    reset_simulation(settings)
-    st.sidebar.success("Settings applied. Simulation reset.")
+selected_video = st.selectbox("Select Video Source:", list(video_options.keys()))
+cap = cv2.VideoCapture(video_options[selected_video])
+desired_width, desired_height = 1280, 720
 
-################################################################################
-#                        SIMULATION CONTROL BUTTONS                            #
-################################################################################
+# Create placeholders for video, controls, congestion, and vehicle count chart
+frame_placeholder = st.empty()
+st.markdown("<br>", unsafe_allow_html=True)
+controls_placeholder = st.empty()
+st.markdown("<br>", unsafe_allow_html=True)
+congestion_placeholder = st.empty()
+st.markdown("<br>", unsafe_allow_html=True)
+vehicle_count_placeholder = st.empty()
 
-col1, col2, col3, col4 = st.columns([1,1,1,2])
-with col1:
-    if st.button("Start Simulation"):
-        st.session_state.sim_running = True
-with col2:
-    if st.button("Stop Simulation"):
-        st.session_state.sim_running = False
-with col3:
-    if st.button("Step Simulation"):
-        run_simulation_step(REFRESH_INTERVAL)
-with col4:
-    auto_chk = st.checkbox("Continuous Animation", value=st.session_state.sim_running)
-    st.session_state.sim_running = auto_chk
+# Color mapping for congestion levels
+congestion_color_mapping = {
+    'Heavy': (0, 0, 255),
+    'Medium': (0, 165, 255),
+    'Light': (0, 255, 0),
+}
 
-################################################################################
-#                           ANIMATION PLACEHOLDER                              #
-################################################################################
+# Initialize playback control variables
+playback_status = st.session_state.get("playback_status", "play")
+current_frame = st.session_state.get("current_frame", 0)
 
-animation_placeholder = st.empty()
+with controls_placeholder.container():
+    col0, col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1, 2])
+    with col1:
+        if st.button("⏪", key='backward'):
+            current_frame -= 30
+            playback_status = "pause"
+    with col2:
+        if st.button("▶️", key='play'):
+            playback_status = "play"
+    with col3:
+        if st.button("⏸", key='pause'):
+            playback_status = "pause"
+    with col4:
+        if st.button("⏩", key='forward'):
+            current_frame += 30
+            playback_status = "pause"
 
-def update_frame():
-    """
-    Renders one single frame inside the single placeholder:
-      - Simulation status text
-      - A single figure with intersection & bar chart
-      - Timings / volumes in card layout
-    """
-    with animation_placeholder.container():
-        # Display top-level simulation status
-        st.markdown(f"### Simulation Time: {st.session_state.sim_time:.1f}s")
-        st.markdown(f"**Active Road (Green):** {directions[st.session_state.current_road_index]}")
-        st.markdown(f"**Remaining Green Time:** {st.session_state.remaining_green_time:.1f}s")
+st.session_state["playback_status"] = playback_status
+st.session_state["current_frame"] = current_frame
 
-        # Build the figure
-        fig = draw_single_figure()
+# ------------------------- FRAME PROCESSING LOOP -------------------------
+frame_index = 0
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+    
+    if playback_status == "play":
+        current_frame += 1
+    # Set video position to the current frame
+    cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+    
+    frame = cv2.resize(frame, (desired_width, desired_height))
+    
+    # --- INTEGRATED TRACKING & SPEED CALCULATIONS ---
+    # Use the tracking function to process the frame
+    tracks = process_frame(frame, model, tracker)
+    # Draw tracks (bounding boxes, speed info, etc.) onto the frame
+    frame = draw_tracks(frame, tracks, track_info)
+    # Count confirmed tracks as total vehicles
+    total_vehicle_count = sum([1 for track in tracks if track.is_confirmed()])
+    # Determine congestion level based on tracked vehicle count
+    congestion_class = get_congestion_level(total_vehicle_count)
+    # --- END OF TRACKING INTEGRATION ---
+    
+    # (Optional) You can still perform additional detection-based analysis if needed.
+    # Overlay vehicle count and congestion level on the video frame
+    cv2.rectangle(frame, (0, 0), (300, 100), (0, 0, 0), -1)
+    cv2.putText(frame, f"Total Vehicles: {total_vehicle_count}", (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+    cv2.putText(frame, f"Congestion: {congestion_class}", (20, 70),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+    
+    frame_placeholder.image(frame, channels='BGR')
+    display_congestion_notification(congestion_class)
+    
+    with vehicle_count_placeholder.container():
+        fig, ax = plt.subplots()
+        fig.patch.set_alpha(0)
+        ax.patch.set_alpha(0)
+        # Use the original analyze_traffic_density if desired (not used here)
+        # Otherwise, create a bar plot for tracked vehicle types (if available)
+        vehicle_types = ['car', 'bus', 'truck', 'motorcycle']
+        # For simplicity, we distribute counts evenly as placeholders
+        counts = [total_vehicle_count/len(vehicle_types)] * len(vehicle_types)
+        bars = ax.bar(vehicle_types, counts, color=['red','green','yellow','pink'], alpha=0.7)
+        ax.set_ylabel("Count", fontsize=12, fontweight='bold', fontdict={'family': 'serif'})
+        ax.set_title("Vehicle Count by Type", fontsize=14, fontweight='bold', fontdict={'family': 'serif'})
+        for index, bar in enumerate(bars):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2, height, f'{int(height)}',
+                    ha='center', va='bottom', fontweight='bold', fontdict={'family': 'serif'})
+        ax.yaxis.grid(True, color='yellow', linestyle=':', linewidth=0.7)
+        ax.set_ylim(bottom=0)
+        ax.set_xticks([])
+        ax.set_xticks(range(len(vehicle_types)))
+        ax.set_xticklabels(vehicle_types, fontsize=10, fontweight='bold', fontdict={'family': 'serif'})
         st.pyplot(fig)
-        plt.close(fig)  # Avoid leftover references
 
-        # Display result cards
-        display_result_cards()
-
-# If user started the simulation, run a continuous loop
-if st.session_state.sim_running:
-    start_time = time.time()
-    while st.session_state.sim_running and st.session_state.sim_time < SIM_DURATION:
-        run_simulation_step(REFRESH_INTERVAL)
-        update_frame()
-        time.sleep(REFRESH_INTERVAL)
-else:
-    # Just render one frame if not running
-    update_frame()
-
-################################################################################
-#                    ACCIDENT SIMULATION & DATA LOGGING                        #
-################################################################################
-
-def simulate_accidents():
-    """
-    Placeholder for random accidents on the active road.
-    Could reduce speed or alter signal timings if desired.
-    """
-    if random.random() < 0.05:
-        st.warning("⚠️ Accident occurred on the active road!")
-
-def log_simulation_data():
-    """
-    Placeholder for logging the simulation data each step.
-    """
-    log_entry = {
-        "time": st.session_state.sim_time,
-        "active_road": directions[st.session_state.current_road_index],
-        "volumes": st.session_state.traffic_volumes.copy()
-    }
-    # For now, just print to console
-    print(log_entry)
-
-if st.session_state.sim_running:
-    simulate_accidents()
-    log_simulation_data()
-
-################################################################################
-#                                 END OF CODE                                  #
-################################################################################
+# Release the video capture when done
+cap.release()

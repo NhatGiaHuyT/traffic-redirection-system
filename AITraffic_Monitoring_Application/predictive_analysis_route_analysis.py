@@ -1,4 +1,7 @@
 import streamlit as st
+from streamlit_lottie import st_lottie
+
+
 import pickle
 import folium
 from streamlit_folium import folium_static
@@ -7,68 +10,130 @@ import heapq
 import requests
 import warnings
 import random
-from streamlit_lottie import st_lottie
 from datetime import datetime, timedelta
+import altair as alt
+import plotly.express as px
 
-# Suppress warnings
+# Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
 
-# Back button in the top right corner
-if st.button("Back", key='back_button'):
-    st.session_state.page = 'home'  # Change session state to go back to home
+################################################################################
+#                               GLOBAL FUNCTIONS                               #
+################################################################################
 
 st.markdown(
     """
     <style>
-    .stSelectbox label {
-        color: black;      /* Change the color of the selectbox label */
-        font-weight: bold; /* Make the text bold */
-        font-size: 18px;   /* Increase the font size */
+    /* Overall background color for the page */
+    body {
+        background-color: #F8F9FA; /* a light grey */
+    }
+
+    /* Default text color */
+    .stText, .stTitle, .stHeader, .stSubheader, .stMarkdown, .stCaption,
+    .stRadio, .stSelectbox, .stButton, .stCheckbox, .stTabs, .stDataFrame,
+    .stMetric, .stAlert, .css-1v0mbdj, .css-1cpxqw2 {
+        color: #212529 !important; /* a dark grey/black */
+    }
+
+    /* Make headers more visible */
+    h1, h2, h3, h4, h5, h6 {
+        color: #212529 !important;
+    }
+
+    /* Adjust the top margin to reduce whitespace */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    /* Example: darken the main header bar at the top */
+    header, .css-18e3th9 {
+        background-color: #343A40;
+    }
+
+    /* If you have a sidebar, you can change its background too */
+    .css-1d391kg {
+        background-color: #FFFFFF !important;
+    }
+
+    /* Buttons: override primary color if desired */
+    .stButton>button {
+        background-color: #1E88E5 !important;
+        color: #FFFFFF !important;
+        border-radius: 5px;
+        border: none;
+    }
+
+    .stElementContainer, .st-emotion-cache-ah6jdd, p {
+        color: #212529 !important; /* a dark grey/black */
+    }
+
+    /* Lottie animation container styling if needed */
+    .lottie-container {
+        margin-top: 0px;
+        margin-bottom: 0px;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# Load the saved graph model (pickle file)
+# Function: load_graph_model
 def load_graph_model(pickle_file):
+    """
+    Load a pre-trained graph model from a pickle file.
+    """
     with open(pickle_file, 'rb') as f:
         graph = pickle.load(f)
     return graph
 
-# Load dataset from CSV
-def load_dataset():
-    data = pd.read_csv(r"Routes_New.csv")
+# Function: load_csv_dataset
+def load_csv_dataset(csv_file):
+    """
+    Load a CSV dataset containing route and traffic data.
+    Expected columns: Date, Time, Day of the Week, Origin, Destination, Route, Weather Conditions,
+                      Accident Reports, Traffic Intensity, Distance.
+    """
+    data = pd.read_csv(csv_file)
     return data
 
-# Modify graph weights dynamically based on dataset information
+# Function: modify_graph_with_data
 def modify_graph_with_data(graph, data):
+    """
+    Modify the graph weights dynamically based on dataset information.
+    Weight calculation uses distance, accident reports, and traffic intensity.
+    """
     for index, row in data.iterrows():
         origin = row['Origin']
         destination = row['Destination']
-        
-        # Get required columns
-        distance = row.get('Distance', 0)  # Default to 0 if the column doesn't exist
-        accidents = row.get('Accident_Reports', 0)  # Default to 0
-        traffic = row.get('Traffic_Intensity', 0)  # Default to 0
-        
-        # Adjust the weight based on real-time factors (accidents, traffic)
-        weight = distance + (accidents * 100) + (traffic * 10)
 
-        # Ensure the graph has both origin and destination
+        # Get required columns with defaults
+        distance = row.get('Distance', 0)
+        accidents = row.get('Accident Reports', 0)
+        traffic = row.get('Traffic Intensity', 0)
+        
+        # Calculate weight: distance + (accidents factor) + (traffic factor)
+        weight = distance + (accidents * 100) + (traffic * 10)
+        
+        # Ensure graph has nodes for origin and destination
         if origin not in graph:
             graph[origin] = {}
         if destination not in graph:
             graph[destination] = {}
 
-        # Update the existing weight with new data
-        graph[origin][destination] = (weight, row.get('Route', 'N/A'))  # Use the route from the dataset
-        graph[destination][origin] = (weight, row.get('Route', 'N/A'))  # Assuming the graph is undirected
-
+        # Update the graph in both directions (undirected graph assumption)
+        graph[origin][destination] = (weight, row.get('Route', 'N/A'))
+        graph[destination][origin] = (weight, row.get('Route', 'N/A'))
+        
     return graph
 
-# Dijkstra's Algorithm to find the shortest path
+# Function: dijkstra
 def dijkstra(graph, start, end):
+    """
+    Find the shortest path between start and end nodes using Dijkstra's algorithm.
+    Returns total cost, path as list, and route details.
+    """
     priority_queue = [(0, start, [], "")]
     visited = set()
     
@@ -91,243 +156,442 @@ def dijkstra(graph, start, end):
     
     return float("inf"), [], ""
 
-# Function to load Lottie animations from URL
+# Function: load_lottieurl
 def load_lottieurl(url: str):
-    r = requests.get(url)
-    if r.status_code != 200:
+    """
+    Load a Lottie animation from a URL.
+    """
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except Exception as e:
         return None
-    return r.json()
 
-# Load the saved traffic prediction model
-model_path = r"traffic_prediction_model.pkl"
-with open(model_path, 'rb') as model_file:
-    model = pickle.load(model_file)
+# Function: predict_congestion_and_time
+def predict_congestion_and_time(route_data, time_adjustment=0):
+    """
+    Predict congestion level and travel time based on the Traffic Intensity.
+    Optionally, adjust traffic intensity based on time of day.
+    """
+    traffic_intensity = int(route_data['Traffic Intensity']) + time_adjustment
+    
+    if traffic_intensity < 30:
+        congestion = 'Low'
+        predicted_time = 15
+    elif 30 <= traffic_intensity < 60:
+        congestion = 'Medium'
+        predicted_time = 30
+    else:
+        congestion = 'High'
+        predicted_time = 60
+    return congestion, predicted_time
 
-# Title for the app
+################################################################################
+#                               APP CONFIGURATION                              #
+################################################################################
+
+
+# Back button in the top right corner
+if st.button("Back", key='back_button'):
+    st.session_state.page = 'home'  # Change session state to go back to home
+
+# Custom CSS for select boxes and other components
 st.markdown(
     """
-    <h1 style='text-align: center;'>
-        Traffic Congestion and Route Optimization
-    </h1>
-    """, 
+    <style>
+    .stSelectbox label {
+        color: #333;
+        font-weight: bold;
+        font-size: 18px;
+    }
+    .sidebar .sidebar-content {
+        background-color: #f5f5f5;
+    }
+    </style>
+    """,
     unsafe_allow_html=True
 )
 
-# Load traffic animation (add your traffic animation URL)
-traffic_animation = load_lottieurl("https://lottie.host/ac9b87c1-302c-4eae-89af-1ac6d54c163b/8gYZJC5OpB.json")  # Replace with your traffic animation URL
+################################################################################
+#                             SIDEBAR CONTROLS                                 #
+################################################################################
 
-# Display traffic animation under the title
-st_lottie(traffic_animation, height=200, key="traffic")
+st.sidebar.header("Navigation & Controls")
 
-# Load weather animations
-clear_animation = load_lottieurl("https://lottie.host/d8ca6425-9e61-49b9-9bf7-8247dac3a459/tJrOUe25Kc.json")  # Example sunny weather animation
-cloudy_animation = load_lottieurl("https://lottie.host/a6de97d2-f147-4699-9a80-e1f6aba6bb6d/FZJoVUa2Np.json")  # Example cloudy weather animation
+# Sidebar: Data file selection (for extensibility)
+data_file = st.sidebar.text_input("Data CSV File Path", "district5_complex_routes_with_datetime.csv")
+graph_file = st.sidebar.text_input("Graph Model File Path", "route_optimization_graph.pkl")
 
-# Randomize weather based on day
-def get_weather_animation():
-    current_day = datetime.now().day  # Get current day
-    random.seed(current_day)  # Set seed based on the day, so it's consistent within the day
-    weather_choice = random.choice(['clear', 'cloudy'])  # Randomly choose clear or cloudy
-    
-    if weather_choice == 'clear':
-        return clear_animation, "Sunny"
-    else:
-        return cloudy_animation, "Cloudy"
+# Sidebar: Time of Day selection for prediction adjustments
+time_option = st.sidebar.selectbox(
+    "Select Time of Day",
+    ["Peak Hours (8-10 AM, 5-7 PM)", "Off-Peak Hours (All other times)"]
+)
 
-# Load the dataset
-file_path = r"Traffic_Congestion_dataset.csv"
-traffic_data = pd.read_csv(file_path)
+# Sidebar: Animation toggle
+animation_toggle = st.sidebar.checkbox("Show Animations", value=True)
 
-# Extract unique routes data once
+################################################################################
+#                              LOAD DATA & MODELS                              #
+################################################################################
+
+# Load traffic dataset
+try:
+    traffic_data = load_csv_dataset(data_file)
+except Exception as e:
+    st.error(f"Error loading CSV file: {e}")
+    st.stop()
+
+# Extract unique route entries (drop duplicates)
 unique_routes = traffic_data[['Origin', 'Destination', 'Route', 'Weather Conditions', 'Accident Reports', 'Traffic Intensity', 'Distance']].drop_duplicates()
 
-# Function to get available destinations for the selected origin
+# Load graph model
+try:
+    graph = load_graph_model(graph_file)
+except Exception as e:
+    st.error(f"Error loading graph model: {e}")
+    st.stop()
+
+# Modify graph with real-time dataset information
+graph = modify_graph_with_data(graph, unique_routes)
+
+################################################################################
+#                               TITLE & HEADER                                 #
+################################################################################
+
+st.markdown(
+    """
+    <h1 style='text-align: center; color: #2c3e50;'>
+        Traffic Congestion and Route Optimization Dashboard
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
+
+################################################################################
+#                             ANIMATION DISPLAY                                #
+################################################################################
+
+if animation_toggle:
+    # Load traffic animation
+    traffic_animation = load_lottieurl("https://lottie.host/ac9b87c1-302c-4eae-89af-1ac6d54c163b/8gYZJC5OpB.json")
+    if traffic_animation:
+        st_lottie(traffic_animation, height=200, key="traffic")
+
+################################################################################
+#                           WEATHER ANIMATION & INFO                           #
+################################################################################
+
+def get_weather_animation():
+    """
+    Randomly select a weather animation (sunny or cloudy) based on the current day.
+    """
+    current_day = datetime.now().day
+    random.seed(current_day)
+    weather_choice = random.choice(['clear', 'cloudy'])
+    if weather_choice == 'clear':
+        return load_lottieurl("https://lottie.host/d8ca6425-9e61-49b9-9bf7-8247dac3a459/tJrOUe25Kc.json"), "Sunny"
+    else:
+        return load_lottieurl("https://lottie.host/a6de97d2-f147-4699-9a80-e1f6aba6bb6d/FZJoVUa2Np.json"), "Cloudy"
+
+weather_animation, weather_description = get_weather_animation()
+
+################################################################################
+#                          USER INPUT FOR ROUTE SELECTION                      #
+################################################################################
+
+st.subheader("Select Your Route")
+
+# Dropdown: Select Origin
+origin = st.selectbox("Select Origin", unique_routes['Origin'].unique())
+
+# Dropdown: Select Destination based on Origin
 def get_destinations(origin):
     return list(unique_routes[unique_routes['Origin'] == origin]['Destination'].unique())
 
-# Function to predict congestion level and travel time based on dataset
-def predict_congestion_and_time(route_data):
-    traffic_intensity = int(route_data['Traffic Intensity'])
-    
-    # Determine congestion level
-    if traffic_intensity < 30:
-        congestion = 'Low'
-        predicted_time = 15  # Minutes for low congestion
-    elif 30 <= traffic_intensity < 60:
-        congestion = 'Medium'
-        predicted_time = 30  # Minutes for medium congestion
-    else:
-        congestion = 'High'
-        predicted_time = 60  # Minutes for high congestion
+destination = st.selectbox("Select Destination", get_destinations(origin))
 
-    return congestion, predicted_time
+# Display selected date/time info from dataset sample (if desired)
+st.write("### Selected Route Details from Historical Data")
+st.write(f"Origin: **{origin}**")
+st.write(f"Destination: **{destination}**")
 
-# Unified Dropdown Pair for Origin and Destination
-origin = st.selectbox('Select Origin', unique_routes['Origin'].unique())
-destination = st.selectbox('Select Destination', get_destinations(origin))
+################################################################################
+#                        ROUTE PREDICTION & CONGESTION INFO                    #
+################################################################################
 
+# Get selected route data (if multiple, choose first)
+try:
+    selected_route = unique_routes[(unique_routes['Origin'] == origin) & 
+                                   (unique_routes['Destination'] == destination)].iloc[0]
+except IndexError:
+    st.error("No data available for the selected route. Please try another combination.")
+    st.stop()
 
+# Adjust traffic intensity based on time selection
+time_adjustment = 20 if time_option == "Peak Hours (8-10 AM, 5-7 PM)" else 0
 
-# Get the weather animation and description
-weather_animation, weather_description = get_weather_animation()
+# Predict congestion and travel time
+congestion, predicted_time = predict_congestion_and_time(selected_route, time_adjustment)
 
+# Display prediction details
+st.markdown("#### Route Prediction")
+st.write(f"**Congestion Level:** {congestion}")
+st.write(f"**Predicted Travel Time:** {predicted_time} minutes")
+st.write(f"**Current Weather:** {weather_description}")
+if animation_toggle and weather_animation:
+    st_lottie(weather_animation, height=200, key="weather")
 
-# Get the selected route data for prediction
-selected_route = unique_routes[(unique_routes['Origin'] == origin) & 
-                               (unique_routes['Destination'] == destination)].iloc[0]
+################################################################################
+#                         MAP VISUALIZATION SECTION                            #
+################################################################################
 
-
-# Get predicted congestion level and travel time for the selected route
-congestion, predicted_time = predict_congestion_and_time(selected_route)
-
-
-# Map part - (Using lat/lon from a dictionary)
+# Coordinates dictionary for map visualization
+# Note: For District 5, update these with real coordinates of your landmarks
 location_coords = {
-    "Connaught Place": (28.6315, 77.2167),
-    "India Gate": (28.6129, 77.2295),
-    "Dhaula Kuan": (28.5921, 77.1734),
-    "Gurugram": (28.4595, 77.0266),
-    "IFFCO Chowk, Gurugram":(28.4722,77.0724),
-    "Dilli Haat":(28.5733,77.2075),
-    "Janakpuri Metro Station":(28.6331,77.0867),
-    "Dwarka Sector 21":(28.5522,77.0583),
-    "Khan Market":(28.6002,77.2270),
-    "Safdarjung Enclave":(28.5647,77.1949),
-    "lajpat Nagar":(28.5649,77.2403),
-    "Greater Kailash":(28.5482,77.2380),
-    "Rohini":(28.7383, 77.0822),
-    "Shiv Vihar": (28.7253, 77.2793)
-    # Add more locations as needed...
+    "Chợ Bình Tây": (10.763, 106.680),
+    "Đền Bà Thiên Hậu": (10.762, 106.684),
+    "Chợ Bình Đông": (10.765, 106.682),
+    "Bưu điện Chợ Lớn": (10.767, 106.686),
+    "Trung tâm Văn hóa Chợ Lớn": (10.768, 106.689),
+    "Bệnh viện Quận 5": (10.770, 106.682),
+    "Trường Tiểu học Chợ Lớn": (10.769, 106.680),
+    "Trung tâm Thương Mại Chợ Lớn": (10.766, 106.687),
+    "Đền Vua": (10.763, 106.683),
+    "Trường Trung học Chợ Lớn": (10.764, 106.685),
+    "Nhà thờ Chợ Lớn": (10.765, 106.688),
+    "Công viên District 5": (10.766, 106.684),
+    "Trung tâm Y tế Quận 5": (10.767, 106.681),
+    "Trung tâm Văn hóa Dân gian": (10.768, 106.683),
+    "Sân vận động Quận 5": (10.769, 106.687),
+    "Bảo tàng Quận 5": (10.770, 106.689),
+    "Ngã tư Lê Văn Sỹ": (10.771, 106.686),
+    "Trạm xe buýt Quận 5": (10.772, 106.682),
+    "Cửa hàng Điện máy X": (10.773, 106.684),
+    "Siêu thị Big C District 5": (10.774, 106.686)
 }
 
-# Approximate lat/lon for these locations (for visualization)
-lat_o, lon_o = location_coords.get(origin, (0, 0))  # Default to (0,0) if location is not found
+# Retrieve lat/lon for origin and destination
+lat_o, lon_o = location_coords.get(origin, (0, 0))
 lat_d, lon_d = location_coords.get(destination, (0, 0))
 
-# Check if both lat/lon are valid before rendering the map
 if lat_o == 0 or lon_o == 0 or lat_d == 0 or lon_d == 0:
-    st.error("Selected location coordinates not found. Please check the location names.")
+    st.error("One or more location coordinates not found. Please verify the location names.")
 else:
-    # Determine polyline color based on congestion level
-    if congestion == 'Low':
-        polyline_color = 'green'
-    elif congestion == 'Medium':
-        polyline_color = 'yellow'
-    else:
-        polyline_color = 'red'
+    # Set polyline color based on congestion level
+    polyline_color = "green" if congestion == "Low" else "yellow" if congestion == "Medium" else "red"
 
-    # Create a folium map centered at the origin location
-    m = folium.Map(location=[lat_o, lon_o], zoom_start=12)
-
-    # Add the route to the map
+    # Create folium map centered on origin
+    m = folium.Map(location=[lat_o, lon_o], zoom_start=13)
+    
+    # Add polyline for route
     folium.PolyLine(
         locations=[(lat_o, lon_o), (lat_d, lon_d)],
-        color=polyline_color,  # Change color based on congestion
+        color=polyline_color,
         weight=6,
         tooltip=f"{origin} to {destination}: {congestion} congestion"
     ).add_to(m)
-
-    # Add circle markers for the origin and destination
+    
+    # Add markers for origin and destination
     folium.CircleMarker(
         location=[lat_o, lon_o],
-        radius=10,
-        color='blue',
+        radius=8,
+        color="blue",
         fill=True,
-        fill_color='blue',
-        fill_opacity=0.6,
+        fill_color="blue",
+        fill_opacity=0.7,
         popup=f"Start: {origin}"
     ).add_to(m)
-
+    
     folium.CircleMarker(
         location=[lat_d, lon_d],
-        radius=10,
-        color='green',
+        radius=8,
+        color="green",
         fill=True,
-        fill_color='green',
-        fill_opacity=0.6,
+        fill_color="green",
+        fill_opacity=0.7,
         popup=f"End: {destination}"
     ).add_to(m)
-
-    # Show the map in Streamlit
-    folium_static(m)
     
-# Get today's date
-today = datetime.now().date()
+    # Display map in app
+    st.subheader("Route Map")
+    folium_static(m)
 
-# Calculate the next day
-next_day = today + timedelta(days=1)
+################################################################################
+#                          BEST ROUTE OPTIMIZATION                             #
+################################################################################
 
-# Display the next day for which the prediction is being made
-st.write(f"**Date (Next Day):** {next_day}")
-
-st.write(f"**Origin:** {origin}")
-st.write(f"**Destination:** {destination}")    
-
-st.write(f"**Congestion Level:** {congestion}")
-st.write(f"**Predicted Travel Time:** {predicted_time} minutes")
-# Display weather animation under congestion prediction section
-
-
-# Display the current weather condition in congestion details
-st.write(f"**Today's Weather:** {weather_description}")
-st_lottie(weather_animation, height=200, key="weather")
-
-
-
-
-# Load graph model
-graph_model_path = r"route_optimization_graph.pkl"
-graph = load_graph_model(graph_model_path)
-
-# Modify the graph with real-time data
-graph = modify_graph_with_data(graph, unique_routes)
-
-# Find the best route using Dijkstra's algorithm
+st.markdown("## Best Route Optimization Using Dijkstra's Algorithm")
 if origin and destination:
     total_cost, path, route_taken = dijkstra(graph, origin, destination)
-
-    # Display the results
     if path:
-        st.write(f"The best route from **{origin}** to **{destination}** is:")
-        st.write(f"Distance: **{total_cost} units**.")
-        
-        # Show the route taken with detailed information
-        st.write("**Route Details:**")
-        st.write(route_taken)  # Displaying the detailed route taken
+        st.write(f"**The best route from {origin} to {destination} is:**")
+        st.write(f"**Distance (Cost):** {total_cost:.2f} units")
+        st.text("Detailed Route Path:")
+        st.text(route_taken)
     else:
         st.write("No path found between the selected origin and destination.")
-        
-# Add a time selector for peak/off-peak hours
-time_option = st.selectbox(
-    'Select Time of Day',
-    ['Peak Hours (8-10 AM, 5-7 PM)', 'Off-Peak Hours (All other times)']
-)
 
-# Modify the congestion prediction function to account for time selection
-def predict_congestion_and_time(route_data, time_option):
-    traffic_intensity = int(route_data['Traffic Intensity'])
+################################################################################
+#                          DATA EXPLORATION & VISUALIZATION                    #
+################################################################################
 
-    # Adjust traffic intensity based on time selection
-    if time_option == 'Peak Hours (8-10 AM, 5-7 PM)':
-        traffic_intensity += 20  # Increase traffic intensity during peak hours
+st.markdown("## Data Exploration & Analysis")
 
-    # Determine congestion level
-    if traffic_intensity < 30:
-        congestion = 'Low'
-        predicted_time = 15  # Minutes for low congestion
-    elif 30 <= traffic_intensity < 60:
-        congestion = 'Medium'
-        predicted_time = 30  # Minutes for medium congestion
-    else:
-        congestion = 'High'
-        predicted_time = 60  # Minutes for high congestion
+# Create tabs for various exploratory views
+tabs = st.tabs(["Overview", "Traffic Analysis", "Accidents & Weather", "Time Trends"])
 
-    return congestion, predicted_time
+# --------------------- TAB 1: OVERVIEW ---------------------
+with tabs[0]:
+    st.subheader("Dataset Overview")
+    st.write("Below is a sample of the traffic congestion dataset:")
+    st.dataframe(traffic_data.head(20), height=300)
 
-# Get predicted congestion level and travel time for the selected route
-congestion, predicted_time = predict_congestion_and_time(selected_route, time_option)
+    st.write("### Basic Statistics")
+    st.write(traffic_data.describe())
 
-# Display congestion details
-st.write(f"**Congestion Level:** {congestion}")
-st.write(f"**Predicted Travel Time:** {predicted_time} minutes")
+# --------------------- TAB 2: TRAFFIC ANALYSIS ---------------------
+with tabs[1]:
+    st.subheader("Traffic Intensity Distribution")
+    fig_traffic = px.histogram(traffic_data, x="Traffic Intensity", nbins=50,
+                               title="Distribution of Traffic Intensity")
+    st.plotly_chart(fig_traffic, use_container_width=True)
+    
+    st.subheader("Traffic Intensity by Route")
+    route_traffic = traffic_data.groupby("Route")["Traffic Intensity"].mean().reset_index()
+    fig_route_traffic = px.bar(route_traffic, x="Route", y="Traffic Intensity",
+                               title="Average Traffic Intensity by Route",
+                               labels={"Traffic Intensity": "Avg Traffic Intensity"})
+    st.plotly_chart(fig_route_traffic, use_container_width=True)
 
+# --------------------- TAB 3: ACCIDENTS & WEATHER ---------------------
+with tabs[2]:
+    st.subheader("Accident Reports Analysis")
+    fig_accidents = alt.Chart(traffic_data).mark_bar().encode(
+        x=alt.X("Accident Reports:Q", bin=alt.Bin(maxbins=20)),
+        y='count()',
+        tooltip=['count()']
+    ).properties(width=700, height=400, title="Distribution of Accident Reports")
+    st.altair_chart(fig_accidents, use_container_width=True)
+
+    st.subheader("Weather Conditions Overview")
+    weather_counts = traffic_data["Weather Conditions"].value_counts().reset_index()
+    weather_counts.columns = ["Weather Conditions", "Count"]
+    fig_weather = px.pie(weather_counts, names="Weather Conditions", values="Count",
+                         title="Weather Conditions Proportion")
+    st.plotly_chart(fig_weather, use_container_width=True)
+
+# --------------------- TAB 4: TIME TRENDS ---------------------
+with tabs[3]:
+    st.subheader("Traffic Trends by Day of the Week")
+    day_traffic = traffic_data.groupby("Day of the Week")["Traffic Intensity"].mean().reset_index()
+    fig_day_traffic = px.line(day_traffic, x="Day of the Week", y="Traffic Intensity",
+                              title="Average Traffic Intensity by Day of the Week",
+                              markers=True)
+    st.plotly_chart(fig_day_traffic, use_container_width=True)
+
+    st.subheader("Accidents Over Time")
+    # Convert Date column to datetime
+    traffic_data["Date"] = pd.to_datetime(traffic_data["Date"])
+    accidents_over_time = traffic_data.groupby("Date")["Accident Reports"].sum().reset_index()
+    fig_accidents_time = px.area(accidents_over_time, x="Date", y="Accident Reports",
+                                 title="Daily Total Accident Reports")
+    st.plotly_chart(fig_accidents_time, use_container_width=True)
+
+################################################################################
+#                          CUSTOM INTERACTIVE FILTERS                          #
+################################################################################
+
+st.markdown("## Interactive Data Filters")
+
+# Sidebar filter for date range selection
+st.sidebar.markdown("### Filter Data by Date")
+min_date = traffic_data["Date"].min()
+max_date = traffic_data["Date"].max()
+date_range = st.sidebar.date_input("Select date range", [min_date, max_date])
+
+# Filter dataset based on selected date range
+if len(date_range) == 2:
+    filtered_data = traffic_data[(traffic_data["Date"] >= pd.to_datetime(date_range[0])) &
+                                 (traffic_data["Date"] <= pd.to_datetime(date_range[1]))]
+else:
+    filtered_data = traffic_data.copy()
+
+st.write("### Data Sample After Date Filter")
+st.dataframe(filtered_data.head(10), height=250)
+
+################################################################################
+#                          ADVANCED VISUALIZATION                              #
+################################################################################
+
+st.markdown("## Advanced Visualizations")
+
+# Advanced Chart: Interactive Scatter Plot for Distance vs Traffic Intensity
+st.subheader("Distance vs. Traffic Intensity Scatter Plot")
+scatter_fig = px.scatter(filtered_data, x="Distance", y="Traffic Intensity",
+                         color="Weather Conditions",
+                         hover_data=["Origin", "Destination", "Accident Reports"],
+                         title="Relationship between Distance and Traffic Intensity")
+st.plotly_chart(scatter_fig, use_container_width=True)
+
+# Advanced Chart: Heatmap for Average Traffic Intensity by Day & Weather
+st.subheader("Heatmap: Day of the Week vs Weather Conditions")
+heatmap_data = filtered_data.groupby(["Day of the Week", "Weather Conditions"])["Traffic Intensity"].mean().reset_index()
+heatmap_fig = px.density_heatmap(heatmap_data, x="Day of the Week", y="Weather Conditions",
+                                 z="Traffic Intensity", color_continuous_scale="Viridis",
+                                 title="Avg Traffic Intensity by Day and Weather")
+st.plotly_chart(heatmap_fig, use_container_width=True)
+
+################################################################################
+#                          FUTURE IMPROVEMENTS & NOTES                         #
+################################################################################
+
+st.markdown("## Future Improvements & Developer Notes")
+st.info("""
+- **Real-time Data Integration:** Consider integrating live traffic data feeds to update predictions dynamically.
+- **Machine Learning Models:** The current prediction is rule-based. Integrating an ML model trained on historical data could improve accuracy.
+- **User Customization:** Expand sidebar filters to include route selection, weather conditions, and time-of-day adjustments.
+- **Mapping Enhancements:** Use more detailed geospatial data and markers, and consider clustering for dense areas.
+- **Performance Optimization:** As the dataset grows, optimize data loading and caching to maintain performance.
+""")
+
+################################################################################
+#                          FOOTER & ADDITIONAL INFORMATION                     #
+################################################################################
+
+st.markdown("""
+---
+**Traffic Congestion and Route Optimization Dashboard**  
+Developed using Streamlit, Folium, Altair, and Plotly.  
+For more details, contact the development team.
+""")
+
+################################################################################
+#                              ADDITIONAL UTILITY CODE                         #
+################################################################################
+# The following code is reserved for future functionality such as exporting data,
+# advanced routing analysis, and integration with external APIs.
+
+def export_filtered_data(dataframe, filename="filtered_data.csv"):
+    """
+    Export the filtered dataframe to a CSV file.
+    """
+    dataframe.to_csv(filename, index=False)
+    st.success(f"Filtered data exported to {filename}")
+
+if st.sidebar.button("Export Filtered Data"):
+    export_filtered_data(filtered_data)
+
+def show_data_summary(df):
+    """
+    Display a detailed summary of the dataset.
+    """
+    st.markdown("### Data Summary")
+    st.write("Number of records:", df.shape[0])
+    st.write("Columns:", list(df.columns))
+    st.write(df.describe())
+
+if st.sidebar.checkbox("Show Data Summary"):
+    show_data_summary(filtered_data)
