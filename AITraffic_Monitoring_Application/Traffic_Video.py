@@ -351,10 +351,10 @@ model, tracker = init_models(model_path)
 
 # 2. Video or Live Stream
 video_options = {
-    "Camera System 1 (Local Video)": r"Traffic.mp4",
-    "Camera System 2": r"Traffic2.mp4",
-    "Camera System 3": r"Traffic3.mp4",
-    "Camera System 4": r"Traffic4.mp4",
+    "Camera System 1 (Local Video)": r"./videos/Traffic.mp4",
+    "Camera System 2": r"./videos/Traffic2.mp4",
+    "Camera System 3": r"./videos/Traffic3.mp4",
+    "Camera System 4": r"./videos/vecteezy_ho-chi-minh-city-traffic-at-intersection-vietnam_1806644.mov",
     "Live Webcam (ID 0)": "webcam0",  # We'll handle "webcam0" as a special case
     # You can also add RTSP links here if you have IP cameras
 }

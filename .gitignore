@@ -4,9 +4,10 @@ env/
 
 
 # Ignore video files in AITraffic_Monitoring_Application
-/AITraffic_Monitoring_Application/*.mp4
-/AITraffic_Monitoring_Application/*.avi
-/AITraffic_Monitoring_Application/*.mov
+videos/
+/**/*.mp4
+/**/*.avi
+/**/*.mov
 
 # Ignore build output
 dist/

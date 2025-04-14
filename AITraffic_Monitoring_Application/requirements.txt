@@ -9,3 +9,5 @@ matplotlib
 opencv-python-headless
 torch
 ultralytics
+deep-sort-realtime
+plotly
