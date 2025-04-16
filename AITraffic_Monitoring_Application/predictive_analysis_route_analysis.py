@@ -213,21 +213,234 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+################################################################################
+#                             LANGUAGE CONTROLS                                #
+################################################################################
+lang_mapping = {"vi":{
+    "page_title": "Bảng điều khiển tắc nghẽn giao thông và tối ưu hóa lộ trình",
+    # sidebar nav
+    "side_nav_title": "Điều hướng & Điều khiển",
+    "side_nav_data_file": "Đường dẫn tệp CSV dữ liệu",
+    "side_nav_graph_file": "Đường dẫn tệp mô hình đồ thị",
+    "side_nav_time_option": "Chọn thời gian trong ngày",
+    "side_nav_time_option_values": ["Giờ cao điểm (8-10 AM, 5-7 PM)", "Giờ thấp điểm (Tất cả các thời gian khác)"],
+    "side_nav_animation": "Hiện hoạt hình",
+    # sidebar filtering
+    "side_fil_title": "Lọc dữ liệu theo ngày",
+    "side_fil_date_range": "Chọn khoảng thời gian",
+    "side_fil_button": "XUẤT DỮ LIỆU ĐÃ LỌC",
+    "side_fil_summary": "Hiện tóm tắt dữ liệu",
+    # route prediction
+    "page_title": "Bảng điều khiển tắc nghẽn giao thông và tối ưu hóa lộ trình",
+    "select_route": "Chọn lộ trình của bạn",
+    "select_origin_label": "Chọn điểm xuất phát",
+    "select_destination_label": "Chọn điểm đến",
+    "select_route_details": "Chi tiết lộ trình đã chọn từ dữ liệu lịch sử",
+    "select_route_details_origin": "Điểm xuất phát",
+    "select_route_details_destination": "Điểm đến",
+    "route_prediction": "Dự đoán lộ trình",
+    "route_prediction_congestion": "Mức độ tắc nghẽn",
+    "route_prediction_time": "Thời gian di chuyển dự đoán",
+    "route_prediction_weather": "Thời tiết hiện tại",
+    "route_map": "Bản đồ lộ trình",
+    "best_route": "Tối ưu hóa lộ trình tốt nhất bằng thuật toán Dijkstra",
+    "best_route_details": "Lộ trình tốt nhất từ {} đến {} là:",
+    "best_route_distance": f"**Khoảng cách (Chi phí):** {{:.2f}} đơn vị",
+    "best_route_path": "Chi tiết lộ trình",
+    # data exploration
+    "data_exploration": "Khám phá và phân tích dữ liệu",
+    "tabs_values": ["Tổng quan", "Phân tích giao thông", "Tai nạn & Thời tiết", "Xu hướng theo thời gian"],
+    "tabs_overview": "Tổng quan",
+    "tabs_traffic_analysis": "Phân tích giao thông",
+    "tabs_accidents_weather": "Tình trạng tai nạn và thời tiết",
+    "tabs_time_trends": "Xu hướng theo thời gian",
+    # overview tab
+    "overview_title": "Tổng quan về tập dữ liệu",
+    "overview_sample": "Dưới đây là một mẫu của tập dữ liệu tắc nghẽn giao thông:",
+    "overview_statistics": "Thống kê cơ bản",
+    # traffic analysis tab
+    "traffic_analysis_title": "Phân phối cường độ giao thông",
+    "traffic_analysis_route": "Cường độ giao thông trung bình theo lộ trình",
+    "traffic_analysis_distribution_title": "Phân phối cường độ giao thông",
+    "traffic_analysis_distribution_x": "Cường độ giao thông",
+    "traffic_analysis_distribution_y": "Số lượng",
+    "traffic_analysis_x_label": "Lộ trình",
+    "traffic_analysis_y_label": "Cường độ giao thông trung bình",
+    # accidents & weather tab
+    "accidents_weather_title": "Phân tích báo cáo tai nạn",
+    "accidents_weather_weather": "Tổng quan về điều kiện thời tiết",
+    "accidents_weather_distribution_title": "Phân phối báo cáo tai nạn",
+    "accidents_weather_distribution_x": "Báo cáo tai nạn (Phân loại)",
+    "accidents_weather_distribution_y": "Số lượng bản ghi",
+    "accidents_weather_weather_conditions_title": "Tỷ lệ điều kiện thời tiết",
+    "accidents_weather_weather_conditions": "Điều kiện thời tiết",
+    "accidents_weather_weather_conditions_count": "Số lượng",
+    # time trends tab
+    "time_trends_title": "Xu hướng giao thông theo ngày trong tuần",
+    "time_trends_by_day_graph_title": "Cường độ giao thông trung bình theo ngày trong tuần",
+    "time_trends_by_day_graph_x": "Ngày trong tuần",
+    "time_trends_accidents": "Tai nạn theo thời gian",
+    "time_trends_accidents_graph_title": "Tổng số báo cáo tai nạn hàng ngày",
+    "time_trends_accidents_graph_x": "Ngày",
+    "time_trends_accidents_graph_y": "Báo cáo tai nạn",
+    # interactive filters
+    "interactive_filters": "Bộ lọc dữ liệu tương tác",
+    "interactive_filters_sample": "Mẫu dữ liệu sau bộ lọc ngày",
+    # advanced visualizations
+    "advanced_visualizations": "Hình ảnh nâng cao",
+    "advanced_scatter": "Biểu đồ phân tán khoảng cách so với cường độ giao thông",
+    "advanced_scatter_x": "Khoảng cách",
+    "advanced_scatter_y": "Cường độ giao thông",
+    "advanced_heatmap": "Bản đồ nhiệt: Ngày trong tuần so với điều kiện thời tiết",
+    "advanced_heatmap_title": "Bản đồ nhiệt cường độ giao thông trung bình theo ngày trong tuần và điều kiện thời tiết",
+    "advanced_heatmap_x": "Ngày trong tuần",
+    "advanced_heatmap_y": "Điều kiện thời tiết",
+    "advanced_heatmap_z": "Tổng cường độ giao thông",
+    # future improvements
+    "future_improvements": "Cải tiến trong tương lai & Ghi chú của nhà phát triển",
+    "future_improvements_note": """
+- **Tích hợp dữ liệu thời gian thực:** Cân nhắc tích hợp nguồn dữ liệu giao thông trực tiếp để cập nhật dự đoán một cách động.
+- **Mô hình học máy:** Dự đoán hiện tại dựa trên quy tắc. Tích hợp mô hình học máy được đào tạo trên dữ liệu lịch sử có thể cải thiện độ chính xác.
+- **Tùy chỉnh của người dùng:** Mở rộng bộ lọc thanh bên để bao gồm lựa chọn lộ trình, điều kiện thời tiết và điều chỉnh thời gian trong ngày.
+- **Cải tiến bản đồ:** Sử dụng dữ liệu địa lý chi tiết hơn và các điểm đánh dấu, và xem xét việc phân nhóm cho các khu vực đông đúc.
+- **Tối ưu hóa hiệu suất:** Khi tập dữ liệu lớn lên, tối ưu hóa việc tải và lưu trữ dữ liệu để duy trì hiệu suất.
+""",
+    # footer
+    "footer": """
+---
+**Bảng điều khiển tắc nghẽn giao thông và tối ưu hóa lộ trình**
+Được phát triển bằng Streamlit, Folium, Altair và Plotly.
+Liên hệ với nhóm phát triển để biết thêm chi tiết.
+""",
 
+    # additional utility code
+    "data_summary": "Hiện tóm tắt dữ liệu",
+    "data_summary_title": "Tóm tắt dữ liệu",
+    "data_summary_records": "Số lượng bản ghi",
+    "data_summary_columns": "Cột",
+    
+}, 
+"en":{
+    "page_title": "Traffic Congestion and Route Optimization Dashboard",
+    # sidebar nav
+    "side_nav_title": "Navigation & Controls",
+    "side_nav_data_file": "Data CSV File Path",
+    "side_nav_graph_file": "Graph Model File Path",
+    "side_nav_time_option": "Select Time of Day",
+    "side_nav_time_option_values": ["Peak Hours (8-10 AM, 5-7 PM)", "Off-Peak Hours (All other times)"],
+    "side_nav_animation": "Show Animations",
+    # sidebar filtering
+    "side_fil_title": "Filter Data by Date",    
+    "side_fil_date_range": "Select date range",
+    "side_fil_button": "EXPORT FILTERED DATA",
+    "side_fil_summary": "Show Data Summary",
+    # route prediction
+    "page_title": "Traffic Congestion and Route Optimization Dashboard",
+    "select_route": "Select Your Route",
+    "select_origin_label": "Select Origin",
+    "select_destination_label": "Select Destination",
+    "select_route_details": "Selected Route Details from Historical Data",
+    "select_route_details_origin": "Origin",
+    "select_route_details_destination": "Destination",
+    "route_prediction": "Route Prediction",
+    "route_prediction_congestion": "Congestion Level",
+    "route_prediction_time": "Predicted Travel Time",
+    "route_prediction_weather": "Current Weather",
+    "route_map": "Route Map",
+    "best_route": "Best Route Optimization Using Dijkstra's Algorithm",
+    "best_route_details": "The best route from {} to {} is:",
+    "best_route_distance": f"**Distance (Cost): {{:.2f}} units**",
+    "best_route_path": "Detailed Route Path",
+    # data exploration
+    "data_exploration": "Data Exploration & Analysis",
+    "tabs_values": ["Overview", "Traffic Analysis", "Accidents & Weather", "Time Trends"],
+    "tabs_overview": "Overview",
+    "tabs_traffic_analysis": "Traffic Analysis",
+    "tabs_accidents_weather": "Accidents & Weather",
+    "tabs_time_trends": "Time Trends",
+    # overview tab
+    "overview_title": "Dataset Overview",
+    "overview_sample": "Below is a sample of the traffic congestion dataset:",
+    "overview_statistics": "Basic Statistics",
+    # traffic analysis tab
+    "traffic_analysis_title": "Traffic Intensity Distribution",
+    "traffic_analysis_route": "Average Traffic Intensity by Route",
+    "traffic_analysis_distribution_title": "Distribution of Traffic Intensity",
+    "traffic_analysis_distribution_x": "Traffic Intensity",
+    "traffic_analysis_distribution_y": "Count",
+    "traffic_analysis_x_label": "Route",
+    "traffic_analysis_y_label": "Avg Traffic Intensity",
+    # accidents & weather tab
+    "accidents_weather_title": "Accident Reports Analysis",
+    "accidents_weather_weather": "Weather Conditions Overview",
+    "accidents_weather_distribution_title": "Distribution of Accident Reports",
+    "accidents_weather_distribution_x": "Accident Reports (Binned)",
+    "accidents_weather_distribution_y": "Count of Records",
+    "accidents_weather_weather_conditions_title": "Weather Conditions Proportion",
+    "accidents_weather_weather_conditions": "Weather Conditions",
+    "accidents_weather_weather_conditions_count": "Count",
+    # time trends tab
+    "time_trends_title": "Traffic Trends by Day of the Week",
+    "time_trends_by_day_graph_title": "Average Traffic Intensity by Day of the Week",
+    "time_trends_by_day_graph_x": "Day of the Week",
+    "time_trends_by_day_graph_y": "Traffic Intensity",
+    "time_trends_accidents": "Accidents Over Time",
+    "time_trends_accidents_graph_title": "Daily Total Accident Reports",
+    "time_trends_accidents_graph_x": "Date",
+    "time_trends_accidents_graph_y": "Accident Reports",
+    # interactive filters
+    "interactive_filters": "Interactive Data Filters",
+    "interactive_filters_sample": "Data Sample After Date Filter",
+    # advanced visualizations
+    "advanced_visualizations": "Advanced Visualizations",
+    "advanced_scatter": "Distance vs. Traffic Intensity Scatter Plot",
+    "advanced_scatter_x": "Distance",
+    "advanced_scatter_y": "Traffic Intensity",
+    "advanced_heatmap": "Heatmap: Day of the Week vs Weather Conditions",
+    "advanced_heatmap_title": "Average Traffic Intensity Heatmap by Day of the Week and Weather Conditions",
+    "advanced_heatmap_x": "Day of the Week",
+    "advanced_heatmap_y": "Weather Conditions",
+    "advanced_heatmap_z": "Sum of Traffic Intensity",
+    # future improvements
+    "future_improvements": "Future Improvements & Developer Notes",
+    "future_improvements_note": """
+- **Real-time Data Integration:** Consider integrating live traffic data feeds to update predictions dynamically.
+- **Machine Learning Models:** The current prediction is rule-based. Integrating an ML model trained on historical data could improve accuracy.
+- **User Customization:** Expand sidebar filters to include route selection, weather conditions, and time-of-day adjustments.
+- **Mapping Enhancements:** Use more detailed geospatial data and markers, and consider clustering for dense areas.
+- **Performance Optimization:** As the dataset grows, optimize data loading and caching to maintain performance.
+""",
+    # footer
+    "footer": """
+---
+**Traffic Congestion and Route Optimization Dashboard**
+Developed using Streamlit, Folium, Altair, and Plotly.
+For more details, contact the development team.
+""",
+    # additional utility code
+    "data_summary_title": "Data Summary",
+    "data_summary_records": "Number of records",
+    "data_summary_columns": "Columns",
+}}
+
+if "lang" not in st.session_state:
+    st.session_state.lang = "vi"  # Default to Vietnamese
+
+lang = st.session_state.lang
 ################################################################################
 #                             SIDEBAR CONTROLS                                 #
 ################################################################################
 
-st.sidebar.header("Navigation & Controls")
+st.sidebar.header(lang_mapping[lang]["side_nav_title"])
 
 # Sidebar: Data file selection (for extensibility)
-data_file = st.sidebar.text_input("Data CSV File Path", "district5_complex_routes_with_datetime.csv")
-graph_file = st.sidebar.text_input("Graph Model File Path", "route_optimization_graph.pkl")
+data_file = st.sidebar.text_input(lang_mapping[lang]["side_nav_data_file"], "district5_complex_routes_with_datetime.csv")
+graph_file = st.sidebar.text_input(lang_mapping[lang]["side_nav_graph_file"], "route_optimization_graph.pkl")
 
 # Sidebar: Time of Day selection for prediction adjustments
 time_option = st.sidebar.selectbox(
-    "Select Time of Day",
-    ["Peak Hours (8-10 AM, 5-7 PM)", "Off-Peak Hours (All other times)"]
+    lang_mapping[lang]["side_nav_time_option"],
+    lang_mapping[lang]["side_nav_time_option_values"],
 )
 
 # Sidebar: Animation toggle
@@ -264,9 +477,9 @@ graph = modify_graph_with_data(graph, unique_routes)
 st.markdown(
     """
     <h1 style='text-align: center; color: #2c3e50;'>
-        Traffic Congestion and Route Optimization Dashboard
+        {page_title}
     </h1>
-    """,
+    """.format(page_title=lang_mapping[lang]["page_title"]),
     unsafe_allow_html=True
 )
 
@@ -302,21 +515,22 @@ weather_animation, weather_description = get_weather_animation()
 #                          USER INPUT FOR ROUTE SELECTION                      #
 ################################################################################
 
-st.subheader("Select Your Route")
+st.subheader(lang_mapping[lang]["select_route"])
 
 # Dropdown: Select Origin
-origin = st.selectbox("Select Origin", unique_routes['Origin'].unique())
+origin = st.selectbox(lang_mapping[lang]["select_origin_label"], unique_routes['Origin'].unique())
 
 # Dropdown: Select Destination based on Origin
 def get_destinations(origin):
     return list(unique_routes[unique_routes['Origin'] == origin]['Destination'].unique())
 
-destination = st.selectbox("Select Destination", get_destinations(origin))
+destination = st.selectbox(lang_mapping[lang]["select_destination_label"]
+    , get_destinations(origin))
 
 # Display selected date/time info from dataset sample (if desired)
-st.write("### Selected Route Details from Historical Data")
-st.write(f"Origin: **{origin}**")
-st.write(f"Destination: **{destination}**")
+st.write(f"### {lang_mapping[lang]['select_route_details']}")
+st.write(f"**{lang_mapping[lang]['select_route_details_origin']}:** {origin}")
+st.write(f"**{lang_mapping[lang]['select_route_details_destination']}:** {destination}")
 
 ################################################################################
 #                        ROUTE PREDICTION & CONGESTION INFO                    #
@@ -331,16 +545,18 @@ except IndexError:
     st.stop()
 
 # Adjust traffic intensity based on time selection
-time_adjustment = 20 if time_option == "Peak Hours (8-10 AM, 5-7 PM)" else 0
+time_adjustment = 20 if time_option == (
+    lang == "en" and "Peak Hours (8-10 AM, 5-7 PM)" or "Giờ cao điểm (8-10 AM, 5-7 PM)"
+) else 0
 
 # Predict congestion and travel time
 congestion, predicted_time = predict_congestion_and_time(selected_route, time_adjustment)
 
 # Display prediction details
-st.markdown("#### Route Prediction")
-st.write(f"**Congestion Level:** {congestion}")
-st.write(f"**Predicted Travel Time:** {predicted_time} minutes")
-st.write(f"**Current Weather:** {weather_description}")
+st.markdown(f"#### {lang_mapping[lang]['route_prediction']}")
+st.write(f"**{lang_mapping[lang]['route_prediction_congestion']}:** {congestion}")
+st.write(f"**{lang_mapping[lang]['route_prediction_time']}:** {predicted_time} minutes")
+st.write(f"**{lang_mapping[lang]['route_prediction_weather']}:** {weather_description}")
 if animation_toggle and weather_animation:
     st_lottie(weather_animation, height=200, key="weather")
 
@@ -416,101 +632,115 @@ else:
     ).add_to(m)
     
     # Display map in app
-    st.subheader("Route Map")
+    st.subheader(lang_mapping[lang]["route_map"])
+    folium.Marker(location=[lat_o, lon_o], popup=origin).add_to(m)
+    folium.Marker(location=[lat_d, lon_d], popup=destination, icon=folium.Icon(color="green")).add_to(m)
     folium_static(m)
 
 ################################################################################
 #                          BEST ROUTE OPTIMIZATION                             #
 ################################################################################
 
-st.markdown("## Best Route Optimization Using Dijkstra's Algorithm")
+st.markdown(f"## {lang_mapping[lang]['best_route']}")
 if origin and destination:
     total_cost, path, route_taken = dijkstra(graph, origin, destination)
     if path:
-        st.write(f"**The best route from {origin} to {destination} is:**")
-        st.write(f"**Distance (Cost):** {total_cost:.2f} units")
-        st.text("Detailed Route Path:")
+        st.write(f"**{lang_mapping[lang]['best_route_details'].format(origin, destination)}**")
+        st.write(f"**{lang_mapping[lang]['best_route_distance'].format(total_cost)}**")
+        st.text(f"{lang_mapping[lang]['best_route_path']}")
         st.text(route_taken)
     else:
-        st.write("No path found between the selected origin and destination.")
+        if lang == "en":
+            st.write("No path found between the selected origin and destination.")
+        else:
+            st.write("Không tìm thấy lộ trình giữa điểm xuất phát và điểm đến đã chọn.")
 
 ################################################################################
 #                          DATA EXPLORATION & VISUALIZATION                    #
 ################################################################################
 
-st.markdown("## Data Exploration & Analysis")
+st.markdown(f"## {lang_mapping[lang]['data_exploration']}")
 
 # Create tabs for various exploratory views
-tabs = st.tabs(["Overview", "Traffic Analysis", "Accidents & Weather", "Time Trends"])
+tabs = st.tabs(lang_mapping[lang]["tabs_values"])
 
 # --------------------- TAB 1: OVERVIEW ---------------------
 with tabs[0]:
-    st.subheader("Dataset Overview")
-    st.write("Below is a sample of the traffic congestion dataset:")
+    st.subheader(lang_mapping[lang]["overview_title"])
+    st.write(lang_mapping[lang]["overview_sample"])
     st.dataframe(traffic_data.head(20), height=300)
 
-    st.write("### Basic Statistics")
+    st.write(f"### {lang_mapping[lang]['overview_statistics']}")
     st.write(traffic_data.describe())
 
 # --------------------- TAB 2: TRAFFIC ANALYSIS ---------------------
 with tabs[1]:
-    st.subheader("Traffic Intensity Distribution")
+    st.subheader(lang_mapping[lang]["traffic_analysis_title"])
     fig_traffic = px.histogram(traffic_data, x="Traffic Intensity", nbins=50,
-                               title="Distribution of Traffic Intensity")
+                               title=lang_mapping[lang]["traffic_analysis_distribution_title"],
+                                 labels={"Traffic Intensity": lang_mapping[lang]["traffic_analysis_distribution_x"],
+                                            "count": lang_mapping[lang]["traffic_analysis_distribution_y"]})
     st.plotly_chart(fig_traffic, use_container_width=True)
     
-    st.subheader("Traffic Intensity by Route")
+    st.subheader(lang_mapping[lang]["traffic_analysis_route"])
     route_traffic = traffic_data.groupby("Route")["Traffic Intensity"].mean().reset_index()
     fig_route_traffic = px.bar(route_traffic, x="Route", y="Traffic Intensity",
-                               title="Average Traffic Intensity by Route",
-                               labels={"Traffic Intensity": "Avg Traffic Intensity"})
+                               title=lang_mapping[lang]["traffic_analysis_route"],
+                               labels={"Traffic Intensity": lang_mapping[lang]["traffic_analysis_y_label"],
+                                       "Route": lang_mapping[lang]["traffic_analysis_x_label"]})
     st.plotly_chart(fig_route_traffic, use_container_width=True)
 
 # --------------------- TAB 3: ACCIDENTS & WEATHER ---------------------
 with tabs[2]:
-    st.subheader("Accident Reports Analysis")
+    st.subheader(lang_mapping[lang]["accidents_weather_title"])
     fig_accidents = alt.Chart(traffic_data).mark_bar().encode(
         x=alt.X("Accident Reports:Q", bin=alt.Bin(maxbins=20)),
         y='count()',
         tooltip=['count()']
-    ).properties(width=700, height=400, title="Distribution of Accident Reports")
+    ).properties(width=700, height=400, title=lang_mapping[lang]["accidents_weather_distribution_title"])
     st.altair_chart(fig_accidents, use_container_width=True)
 
-    st.subheader("Weather Conditions Overview")
+    st.subheader(lang_mapping[lang]["accidents_weather_weather"])
     weather_counts = traffic_data["Weather Conditions"].value_counts().reset_index()
-    weather_counts.columns = ["Weather Conditions", "Count"]
-    fig_weather = px.pie(weather_counts, names="Weather Conditions", values="Count",
-                         title="Weather Conditions Proportion")
+    weather_counts.columns = [lang_mapping[lang]["accidents_weather_weather_conditions"],
+                                lang_mapping[lang]["accidents_weather_weather_conditions_count"]]
+    fig_weather = px.pie(weather_counts, names=lang_mapping[lang]["accidents_weather_weather_conditions"],
+                            values=lang_mapping[lang]["accidents_weather_weather_conditions_count"],
+                         title=lang_mapping[lang]["accidents_weather_weather_conditions_title"])
     st.plotly_chart(fig_weather, use_container_width=True)
 
 # --------------------- TAB 4: TIME TRENDS ---------------------
 with tabs[3]:
-    st.subheader("Traffic Trends by Day of the Week")
+    st.subheader(lang_mapping[lang]["time_trends_title"])
     day_traffic = traffic_data.groupby("Day of the Week")["Traffic Intensity"].mean().reset_index()
     fig_day_traffic = px.line(day_traffic, x="Day of the Week", y="Traffic Intensity",
-                              title="Average Traffic Intensity by Day of the Week",
+                              title=lang_mapping[lang]["time_trends_by_day_graph_title"],
+                                labels={"Traffic Intensity": lang_mapping[lang]["traffic_analysis_y_label"],
+                                        "Day of the Week": lang_mapping[lang]["time_trends_by_day_graph_x"]},
                               markers=True)
     st.plotly_chart(fig_day_traffic, use_container_width=True)
 
-    st.subheader("Accidents Over Time")
+    st.subheader(lang_mapping[lang]["time_trends_accidents"])
     # Convert Date column to datetime
     traffic_data["Date"] = pd.to_datetime(traffic_data["Date"])
     accidents_over_time = traffic_data.groupby("Date")["Accident Reports"].sum().reset_index()
     fig_accidents_time = px.area(accidents_over_time, x="Date", y="Accident Reports",
-                                 title="Daily Total Accident Reports")
+                                 title="Daily Total Accident Reports",
+                                    labels={"Accident Reports": lang_mapping[lang]["time_trends_accidents_graph_y"],
+                                            "Date": lang_mapping[lang]["time_trends_accidents_graph_x"]})
     st.plotly_chart(fig_accidents_time, use_container_width=True)
 
 ################################################################################
 #                          CUSTOM INTERACTIVE FILTERS                          #
 ################################################################################
 
-st.markdown("## Interactive Data Filters")
+st.markdown(f"## {lang_mapping[lang]['interactive_filters']}")
 
 # Sidebar filter for date range selection
-st.sidebar.markdown("### Filter Data by Date")
+st.sidebar.markdown(f"### {lang_mapping[lang]['side_fil_title']}")
 min_date = traffic_data["Date"].min()
 max_date = traffic_data["Date"].max()
-date_range = st.sidebar.date_input("Select date range", [min_date, max_date])
+date_range = st.sidebar.date_input(lang_mapping[lang]["side_fil_date_range"], [min_date, max_date])
 
 # Filter dataset based on selected date range
 if len(date_range) == 2:
@@ -519,54 +749,48 @@ if len(date_range) == 2:
 else:
     filtered_data = traffic_data.copy()
 
-st.write("### Data Sample After Date Filter")
+st.write(f"### {lang_mapping[lang]['interactive_filters_sample']}")
 st.dataframe(filtered_data.head(10), height=250)
 
 ################################################################################
 #                          ADVANCED VISUALIZATION                              #
 ################################################################################
 
-st.markdown("## Advanced Visualizations")
+st.markdown(f"## {lang_mapping[lang]['advanced_visualizations']}")
 
 # Advanced Chart: Interactive Scatter Plot for Distance vs Traffic Intensity
-st.subheader("Distance vs. Traffic Intensity Scatter Plot")
+st.subheader(lang_mapping[lang]["advanced_scatter"])
 scatter_fig = px.scatter(filtered_data, x="Distance", y="Traffic Intensity",
                          color="Weather Conditions",
                          hover_data=["Origin", "Destination", "Accident Reports"],
-                         title="Relationship between Distance and Traffic Intensity")
+                         title=lang_mapping[lang]["advanced_scatter"],
+                            labels={"Distance": lang_mapping[lang]["advanced_scatter_x"],
+                                    "Traffic Intensity": lang_mapping[lang]["advanced_scatter_y"]})
 st.plotly_chart(scatter_fig, use_container_width=True)
 
 # Advanced Chart: Heatmap for Average Traffic Intensity by Day & Weather
-st.subheader("Heatmap: Day of the Week vs Weather Conditions")
+st.subheader(lang_mapping[lang]["advanced_heatmap"])
 heatmap_data = filtered_data.groupby(["Day of the Week", "Weather Conditions"])["Traffic Intensity"].mean().reset_index()
 heatmap_fig = px.density_heatmap(heatmap_data, x="Day of the Week", y="Weather Conditions",
                                  z="Traffic Intensity", color_continuous_scale="Viridis",
-                                 title="Avg Traffic Intensity by Day and Weather")
+                                 title=lang_mapping[lang]["advanced_heatmap_title"],
+                                    labels={"Traffic Intensity": lang_mapping[lang]["advanced_heatmap_z"],
+                                            "Day of the Week": lang_mapping[lang]["advanced_heatmap_x"],
+                                            "Weather Conditions": lang_mapping[lang]["advanced_heatmap_y"]})
 st.plotly_chart(heatmap_fig, use_container_width=True)
 
 ################################################################################
 #                          FUTURE IMPROVEMENTS & NOTES                         #
 ################################################################################
 
-st.markdown("## Future Improvements & Developer Notes")
-st.info("""
-- **Real-time Data Integration:** Consider integrating live traffic data feeds to update predictions dynamically.
-- **Machine Learning Models:** The current prediction is rule-based. Integrating an ML model trained on historical data could improve accuracy.
-- **User Customization:** Expand sidebar filters to include route selection, weather conditions, and time-of-day adjustments.
-- **Mapping Enhancements:** Use more detailed geospatial data and markers, and consider clustering for dense areas.
-- **Performance Optimization:** As the dataset grows, optimize data loading and caching to maintain performance.
-""")
+st.markdown(f"## {lang_mapping[lang]['future_improvements']}")
+st.info(lang_mapping[lang]["future_improvements_note"])
 
 ################################################################################
 #                          FOOTER & ADDITIONAL INFORMATION                     #
 ################################################################################
 
-st.markdown("""
----
-**Traffic Congestion and Route Optimization Dashboard**  
-Developed using Streamlit, Folium, Altair, and Plotly.  
-For more details, contact the development team.
-""")
+st.markdown(f"### {lang_mapping[lang]['footer']}")
 
 ################################################################################
 #                              ADDITIONAL UTILITY CODE                         #
@@ -581,7 +805,7 @@ def export_filtered_data(dataframe, filename="filtered_data.csv"):
     dataframe.to_csv(filename, index=False)
     st.success(f"Filtered data exported to {filename}")
 
-if st.sidebar.button("Export Filtered Data"):
+if st.sidebar.button(lang_mapping[lang]["side_fil_button"]):
     export_filtered_data(filtered_data)
 
 def show_data_summary(df):
@@ -593,5 +817,5 @@ def show_data_summary(df):
     st.write("Columns:", list(df.columns))
     st.write(df.describe())
 
-if st.sidebar.checkbox("Show Data Summary"):
+if st.sidebar.checkbox(lang_mapping[lang]["data_summary"]):
     show_data_summary(filtered_data)

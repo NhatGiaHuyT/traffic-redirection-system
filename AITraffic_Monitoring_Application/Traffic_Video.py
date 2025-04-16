@@ -272,7 +272,7 @@ def get_vehicle_counts_in_roi(tracks, polygon):
 ################################################################################
 #                    ADAPTIVE CONGESTION THRESHOLDS & ALERTS                   #
 ################################################################################
-def get_congestion_level(total_vehicle_count, threshold_medium, threshold_heavy):
+def get_congestion_level(total_vehicle_count, threshold_medium, threshold_heavy, lang="vi"):
     """
     Return 'Light', 'Medium', or 'Heavy' based on user-defined thresholds.
     """
@@ -284,6 +284,7 @@ def get_congestion_level(total_vehicle_count, threshold_medium, threshold_heavy)
         return 'Light'
 
 def display_congestion_notification(congestion_class, placeholder):
+    
     colors = {
         'Heavy': ('rgba(255, 0, 0, 0.5)', 'red'),
         'Medium': ('rgba(255, 165, 0, 0.5)', 'orange'),
@@ -331,22 +332,89 @@ def log_data_to_csv(log_df, csv_file="traffic_log.csv"):
         log_df.to_csv(csv_file, mode='a', header=False, index=False)
 
 ################################################################################
+#                             LANGUAGE CONTROLS                                #
+################################################################################
+
+lang_mapping = {
+    "vi": {
+        "page_title": "Ứng Dụng <span style='color: #FF5733;'>Giám Sát Giao Thông</span>",
+        "side_title": "Cấu Hình & Điều Khiển",
+        "model_path_label": "Đường Dẫn Mô Hình Detection",
+        "video_source_label": "Chọn Nguồn Video:",
+        "medium_congestion_label": "Ngưỡng Tắc Nghẽn Trung Bình",
+        "heavy_congestion_label": "Ngưỡng Tắc Nghẽn Nặng",
+        "color_by_speed_label": "Tô màu khung theo tốc độ",
+        "direction_detection_label": "Bật phát hiện hướng di chuyển",
+        "alert_mode_label": "Chế độ cảnh báo",
+        "roi_counting_label": "Sử dụng đếm theo ROI",
+        "show_charts_label": "Hiển thị biểu đồ thời gian thực",
+        "logging_label": "Bật ghi log vào CSV",
+        "back_button": "Quay lại",
+        "n.o.vehicles_label": "So xe trong ROI",
+        "congestion_label": "Do tac nghen",
+        "bar_chart_label": "Số lượng xe trong ROI theo loại",
+        "bar_chart_label_default": "Số lượng xe trong ROI",
+        "bar_chart_label_no_roi": "Tổng số xe (không có ROI)",
+        "bar_y_label": "Số lượng",
+        "bar_x_label": "Loại xe",
+        "df_chart_title": "Số lượng xe theo thời gian thực trong ROI",
+        "df_y_label": "Số lượng xe",
+        "df_x_label": "Thời gian",
+
+    },
+    "en": {
+        "page_title": "<span style='color: #FF5733;'>Traffic Monitoring</span> Application",
+        "side_title": "Configuration & Controls",
+        "model_path_label": "YOLO Model Path",
+        "video_source_label": "Select Video Source:",
+        "medium_congestion_label": "Medium Congestion Threshold",
+        "heavy_congestion_label": "Heavy Congestion Threshold",
+        "color_by_speed_label": "Color bounding boxes by speed",
+        "direction_detection_label": "Enable direction detection",
+        "alert_mode_label": "Alert Mode",
+        "roi_counting_label": "Use ROI-based Counting",
+        "show_charts_label": "Show Real-Time Charts (Time-Series)",
+        "logging_label": "Enable CSV Logging",
+        "back_button": "Back",
+        "n.o.vehicles_label": "Vehicles in ROI",
+        "congestion_label": "Congestion Level",
+        "bar_chart_label": "Vehicle Count in ROI by Class",
+        "bar_chart_label_default": "Vehicle Count in ROI",
+        "bar_chart_label_no_roi": "Total Vehicles (No ROI)",
+        "bar_y_label": "Count",
+        "bar_x_label": "Vehicle Class",
+        "df_chart_title": "Real-Time Vehicle Count in ROI",
+        "df_y_label": "Vehicle Count",
+        "df_x_label": "Timestamp",
+    }
+}
+if "lang" not in st.session_state:
+    st.session_state.lang = "vi"  # Default to Vietnamese
+
+lang = st.session_state.lang
+
+################################################################################
 #                             STREAMLIT APPLICATION                            #
 ################################################################################
 
 # Title
 st.markdown(
     """
-    <h1 style='text-align: center; color: black; white-space: nowrap;'>Enhanced Traffic Feed with Multiple Features</h1>
-    """,
+    <h1 style='text-align: center; color: black; white-space: nowrap;'>
+    {page_title}
+    </h1>
+    """.format(
+        page_title=lang_mapping[lang]["page_title"]
+    )
+    ,
     unsafe_allow_html=True
 )
 
 # Sidebar controls
-st.sidebar.header("Configuration & Controls")
+st.sidebar.header(lang_mapping[lang]["side_title"])
 
 # 1. Model path
-model_path = st.sidebar.text_input("YOLO Model Path", value=DEFAULT_MODEL_PATH)
+model_path = st.sidebar.text_input(lang_mapping[lang]["model_path_label"], value=DEFAULT_MODEL_PATH)
 model, tracker = init_models(model_path)
 
 # 2. Video or Live Stream
@@ -358,34 +426,42 @@ video_options = {
     "Live Webcam (ID 0)": "webcam0",  # We'll handle "webcam0" as a special case
     # You can also add RTSP links here if you have IP cameras
 }
-
-selected_video = st.sidebar.selectbox("Select Video Source:", list(video_options.keys()))
+selected_video = st.sidebar.selectbox(lang_mapping[lang]["video_source_label"], list(video_options.keys()), index=0)
 
 # 3. Adaptive Threshold Sliders
-threshold_medium = st.sidebar.slider("Medium Congestion Threshold", min_value=1, max_value=50, value=10)
-threshold_heavy = st.sidebar.slider("Heavy Congestion Threshold", min_value=5, max_value=100, value=20)
+threshold_medium = st.sidebar.slider(lang_mapping[lang]["medium_congestion_label"]
+    , min_value=1, max_value=50, value=8)
+threshold_heavy = st.sidebar.slider(lang_mapping[lang]["heavy_congestion_label"]
+    , min_value=5, max_value=100, value=15)
 
 # 4. Speed-based Color Coding
-color_by_speed = st.sidebar.checkbox("Color bounding boxes by speed", value=True)
+color_by_speed = st.sidebar.checkbox(lang_mapping[lang]["color_by_speed_label"]
+    , value=True)
 
 # 5. Direction Detection
-direction_detection = st.sidebar.checkbox("Enable direction detection", value=True)
+direction_detection = st.sidebar.checkbox(lang_mapping[lang]["direction_detection_label"]
+    , value=True)
 
 # 6. Alert Mode
-alert_mode = st.sidebar.selectbox("Alert Mode", ["none", "audio", "webhook"], index=0)
+alert_mode = st.sidebar.selectbox(lang_mapping[lang]["alert_mode_label"]
+    , ["none", "audio", "webhook"], index=0)
 
 # 7. ROI-based Counting
-use_roi = st.sidebar.checkbox("Use ROI-based Counting", value=True)
+use_roi = st.sidebar.checkbox(lang_mapping[lang]["roi_counting_label"]
+    , value=True)
 
 # 8. Show real-time charts
-show_charts = st.sidebar.checkbox("Show Real-Time Charts (Time-Series)", value=True)
+show_charts = st.sidebar.checkbox(lang_mapping[lang]["show_charts_label"]
+    , value=True)
 
 # 9. Historical Logging
-enable_logging = st.sidebar.checkbox("Enable CSV Logging", value=False)
+enable_logging = st.sidebar.checkbox(lang_mapping[lang]["logging_label"]
+    , value=False)
 
 # 10. Playback controls
 st.markdown("<hr>", unsafe_allow_html=True)
-if st.button("Back", key='back_button'):
+if st.button(lang_mapping[lang]["back_button"]
+    , key='back_button'):
     st.session_state.page = 'home'
 
 # Background image
@@ -495,13 +571,13 @@ while cap.isOpened():
         class_counts_roi = {}
 
     # 4. Congestion level
-    congestion_class = get_congestion_level(total_in_roi, threshold_medium, threshold_heavy)
+    congestion_class = get_congestion_level(total_in_roi, threshold_medium, threshold_heavy, lang=lang)
 
     # 5. Overlay info on the frame
     cv2.rectangle(frame, (0, 0), (320, 120), (0, 0, 0), -1)
-    cv2.putText(frame, f"Vehicles: {total_in_roi}", (20, 40),
+    cv2.putText(frame, f"{lang_mapping[lang]['n.o.vehicles_label']}: {total_in_roi}", (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-    cv2.putText(frame, f"Congestion: {congestion_class}", (20, 70),
+    cv2.putText(frame, f"{lang_mapping[lang]['congestion_label']}: {congestion_class}", (20, 70),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
     # 6. FPS calculation
@@ -528,18 +604,26 @@ while cap.isOpened():
             if not class_counts_roi:
                 # If no vehicles, just show empty
                 ax.bar(["None"], [0], color='gray')
-                ax.set_title("Vehicles in ROI")
+                ax.set_title(
+                    lang_mapping[lang]["bar_chart_label_default"]
+                )
             else:
                 keys = list(class_counts_roi.keys())
                 vals = list(class_counts_roi.values())
                 ax.bar(keys, vals, color='orange', alpha=0.7)
-                ax.set_title("Vehicle Count in ROI by Class")
+                ax.set_title(
+                    lang_mapping[lang]["bar_chart_label"]
+                )
         else:
             # If ROI disabled, just show total_in_roi
             ax.bar(["All Vehicles"], [total_in_roi], color='green', alpha=0.7)
-            ax.set_title("Total Vehicles (No ROI)")
+            ax.set_title(
+                lang_mapping[lang]["bar_chart_label_no_roi"]
+            )
 
-        ax.set_ylabel("Count", fontsize=12, fontweight='bold')
+        ax.set_ylabel(
+            lang_mapping[lang]["bar_y_label"]
+            , fontsize=12, fontweight='bold')
         ax.yaxis.grid(True, color='yellow', linestyle=':', linewidth=0.7)
         st.pyplot(fig)
 
@@ -551,15 +635,23 @@ while cap.isOpened():
 
         # Build a DataFrame
         chart_df = pd.DataFrame({
-            "timestamp": time_series_timestamps,
-            "vehicle_count": time_series_data
+            f"{
+                lang_mapping[lang]["df_x_label"]
+            }": time_series_timestamps,
+            f"{
+                lang_mapping[lang]["df_y_label"]
+            }": time_series_data
         })
 
         # Use Altair to create a line chart
         line_chart = alt.Chart(chart_df).mark_line(point=True).encode(
-            x='timestamp:T',
-            y='vehicle_count:Q'
-        ).properties(title="Real-Time Vehicle Count in ROI")
+            x=f'{
+                lang_mapping[lang]["df_x_label"]
+            }:T',
+            y=f'{
+                lang_mapping[lang]["df_y_label"]
+            }:Q'
+        ).properties(title=lang_mapping[lang]["df_chart_title"])
         chart_placeholder.altair_chart(line_chart, use_container_width=True)
 
     # 11. Historical Logging

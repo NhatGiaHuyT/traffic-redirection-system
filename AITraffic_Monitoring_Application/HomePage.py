@@ -34,6 +34,7 @@ st.markdown(
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
         position: relative;
         overflow: hidden;
+        color: mistyrose;
     }
     
     .main-header::before {
@@ -165,11 +166,18 @@ st.markdown(
     /* Home Button */
     .home-button {
         position: fixed;
-        top: 20px;
+        top: 62px;
         left: 20px;
         z-index: 999;
     }
-    
+
+    .lang-button {
+        position: fixed;
+        top: 62px;
+        left: 20px;
+        z-index: 999;
+    }
+
     .home-button button {
         background: linear-gradient(to right, #1e3c72, #2a5298);
         color: white;
@@ -190,6 +198,8 @@ st.markdown(
         transform: scale(1.1);
         box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
     }
+
+    
     
     /* Road Animation */
     .road-container {
@@ -212,7 +222,7 @@ st.markdown(
         height: 4px;
         background: #ffcc00;
         width: 30px;
-        animation: roadLine 2s linear infinite;
+        animation: roadLine 5s linear infinite;
     }
     
     @keyframes roadLine {
@@ -221,10 +231,10 @@ st.markdown(
     }
     
     .road-line:nth-child(1) { animation-delay: 0s; }
-    .road-line:nth-child(2) { animation-delay: 0.4s; }
-    .road-line:nth-child(3) { animation-delay: 0.8s; }
-    .road-line:nth-child(4) { animation-delay: 1.2s; }
-    .road-line:nth-child(5) { animation-delay: 1.6s; }
+    .road-line:nth-child(2) { animation-delay: 1s; }
+    .road-line:nth-child(3) { animation-delay: 2s; }
+    .road-line:nth-child(4) { animation-delay: 3s; }
+    .road-line:nth-child(5) { animation-delay: 4s; }
     
     /* Card container to ensure equal height */
     .feature-container {
@@ -246,21 +256,59 @@ st.markdown(
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
+if 'lang' not in st.session_state:
+    st.session_state.lang = 'vi'
+selected_lang = st.toggle("🇻🇳", value="vi", key="lang_selector") and "vi" or "en"
+# Add language button
+lang_mapping = {
+    "vi": {
+        "home_title": "Chào mừng đến với RouteVision AI!",
+        "home_subtitle": "Nền tảng Giám sát & Tối ưu hóa Giao thông Tiên tiến",
+        "home_traffic_feed": "Thông Tin Giao Thông",
+        "home_route_optimizer": "Lộ Trình Tối Ưu",
+        "home_signal_simulation": "Mô Phỏng Tín Hiệu",
+        "home_traffic_feed_desc": "Xem camera giao thông thời gian thực với phân tích AI. Giám sát ùn tắc, sự cố và lưu lượng giao thông trên toàn mạng lưới của bạn.",
+        "home_route_optimizer_desc": "Tìm lộ trình nhanh nhất với phân tích dự đoán AI. Tránh ùn tắc và giảm thời gian di chuyển với thông tin giao thông thời gian thực.",
+        "home_signal_simulation_desc": "Kiểm soát và mô phỏng tín hiệu giao thông thông minh. Kiểm tra chiến lược thời gian tín hiệu và tối ưu hóa lưu lượng giao thông với hệ thống AI của chúng tôi.",
+        "home_feature_desc": "Tính năng nổi bật",
+        "home_feature_traffic_feed": "KHÁM PHÁ THÔNG TIN GIAO THÔNG",
+        "home_feature_route_optimizer": "TỐI ƯU LỘ TRÌNH",
+        "home_feature_signal_simulation": "THỰC HIỆN MÔ PHỎNG",
+        "home_dashboard_preview": "Làm cho các thành phố thông minh hơn",
+        "home_dashboard_desc": "RouteVision AI giúp các nhà quản lý giao thông, nhà quy hoạch đô thị và người đi lại đưa ra quyết định tốt hơn thông qua phân tích dữ liệu thời gian thực và mô hình dự đoán. Nền tảng của chúng tôi giảm ùn tắc, khí thải và thời gian di chuyển.",
+        "home_footer": "© 2025 RouteVision AI - Chuyển Đổi Giao Thông Đô Thị Thông Qua Trí Tuệ Nhân Tạo",
+        "home_button": "🏠 Trang Chủ",
+    },
+    "en": {
+        "home_title": "Welcome to RouteVision AI!",
+        "home_subtitle": "Advanced Traffic Monitoring & Optimization Platform",
+        "home_traffic_feed": "Traffic Feed",
+        "home_route_optimizer": "Route Optimizer",
+        "home_signal_simulation": "Signal Simulation",
+        "home_traffic_feed_desc": "View real-time traffic cameras with AI-powered analytics. Monitor congestion, incidents, and traffic flow across your network.",
+        "home_route_optimizer_desc": "Find the fastest routes with AI predictive analysis. Avoid congestion and reduce travel time with real-time traffic insights.",
+        "home_signal_simulation_desc": "Smart traffic signal control and simulation. Test signal timing strategies and optimize traffic flow with our AI-powered system.",
+        "home_feature_desc": "Featured",
+        "home_feature_traffic_feed": "EXPLORE TRAFFIC FEED",
+        "home_feature_route_optimizer": "OPTIMIZE ROUTES",
+        "home_feature_signal_simulation": "RUN SIMULATION",
+        "home_dashboard_preview": "Making Cities Smarter",
+        "home_dashboard_desc": "RouteVision AI helps traffic managers, city planners, and commuters make better decisions through real-time data analysis and predictive modeling. Our platform reduces congestion, emissions, and travel times.",
+        "home_footer": "© 2025 RouteVision AI - Transforming Urban Mobility Through Artificial Intelligence",
+        "home_button": "🏠 Home",
+    }
+
+}
+if selected_lang != st.session_state.lang:
+    st.session_state.lang = selected_lang
+
 # Add home button when not on home page
 if st.session_state.page != 'home':
-    home_button_placeholder = st.empty()
-    with home_button_placeholder:
-        st.markdown(
-            """
-            <div class="home-button">
-                <button onclick="document.getElementById('home-button-hidden').click()">🏠</button>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
     # Hidden button to trigger the action
-    if st.button("Home", key="home-button-hidden", help="Return to homepage"):
+    if st.button(lang_mapping[st.session_state.lang]["home_button"]
+        , key="home-button-hidden", help="Return to homepage"):
         st.session_state.page = 'home'
+    
 
 # Logic to navigate to different Python files
 if st.session_state.page == 'home':
@@ -279,15 +327,22 @@ if st.session_state.page == 'home':
         """,
         unsafe_allow_html=True
     )
-    
+
     # Header with traffic-themed design
     st.markdown(
         """
         <div class="main-header">
-            <h1 class="header-title">RouteVision AI</h1>
-            <h3 class="header-subtitle">Advanced Traffic Monitoring & Optimization Platform</h3>
+            <h1 class="header-title">
+                {home_title}
+            </h1>
+            <h3 class="header-subtitle">
+                {home_subtitle}
+            </h3>
         </div>
-        """,
+        """.format(
+            home_title=lang_mapping[st.session_state.lang]["home_title"],
+            home_subtitle=lang_mapping[st.session_state.lang]["home_subtitle"]
+        ),
         unsafe_allow_html=True
     )
     
@@ -300,14 +355,18 @@ if st.session_state.page == 'home':
             <div class="feature-card">
                 <div class="feature-container">
                     <div class="feature-icon">🎥</div>
-                    <div class="feature-title">Traffic Feed</div>
-                    <div class="feature-description">View real-time traffic cameras with AI-powered analytics. Monitor congestion, incidents, and traffic flow across your network.</div>
+                    <div class="feature-title">{home_traffic_feed}</div>
+                    <div class="feature-description">{home_traffic_feed_desc}</div>
                 </div>
             </div>
-            """,
+            """
+            .format(
+                home_traffic_feed=lang_mapping[st.session_state.lang]["home_traffic_feed"],
+                home_traffic_feed_desc=lang_mapping[st.session_state.lang]["home_traffic_feed_desc"]
+            ),
             unsafe_allow_html=True
         )
-        if st.button("EXPLORE TRAFFIC FEED", key="traffic_btn"):
+        if st.button(lang_mapping[st.session_state.lang]["home_traffic_feed"], key="traffic_btn"):
             st.session_state.page = 'traffic_video'
     
     with col2:
@@ -316,14 +375,19 @@ if st.session_state.page == 'home':
             <div class="feature-card">
                 <div class="feature-container">
                     <div class="feature-icon">🗺️</div>
-                    <div class="feature-title">Route Optimizer</div>
-                    <div class="feature-description">Find the fastest routes with AI predictive analysis. Avoid congestion and reduce travel time with real-time traffic insights.</div>
+                    <div class="feature-title">{home_route_optimizer}</div>
+                    <div class="feature-description">{home_route_optimizer_desc}</div>
                 </div>
             </div>
-            """,
+            """
+            .format(
+                home_route_optimizer=lang_mapping[st.session_state.lang]["home_route_optimizer"],
+                home_route_optimizer_desc=lang_mapping[st.session_state.lang]["home_route_optimizer_desc"]
+            ),
             unsafe_allow_html=True
         )
-        if st.button("OPTIMIZE ROUTES", key="route_btn"):
+        if st.button(lang_mapping[st.session_state.lang]["home_route_optimizer"]
+            , key="route_btn"):
             st.session_state.page = 'route_optimize_predictor'
     
     with col3:
@@ -332,11 +396,14 @@ if st.session_state.page == 'home':
             <div class="feature-card">
                 <div class="feature-container">
                     <div class="feature-icon">🚦</div>
-                    <div class="feature-title">Signal Simulation</div>
-                    <div class="feature-description">Smart traffic signal control and simulation. Test signal timing strategies and optimize traffic flow with our AI-powered system.</div>
+                    <div class="feature-title">{home_signal_simulation}</div>
+                    <div class="feature-description">{home_signal_simulation_desc}</div>
                 </div>
             </div>
-            """,
+            """.format(
+                home_signal_simulation=lang_mapping[st.session_state.lang]["home_signal_simulation"],
+                home_signal_simulation_desc=lang_mapping[st.session_state.lang]["home_signal_simulation_desc"]
+            ),
             unsafe_allow_html=True
         )
         if st.button("RUN SIMULATION", key="signal_btn"):
@@ -354,13 +421,15 @@ if st.session_state.page == 'home':
     st.markdown(
         """
         <div style="text-align: center; margin: 40px 0 20px 0;">
-            <h2 style="color: #1e3c72; font-size: 28px; margin-bottom: 15px;">Making Cities Smarter</h2>
+            <h2 style="color: #1e3c72; font-size: 28px; margin-bottom: 15px;">{home_dashboard_preview}</h2>
             <p style="color: #555; max-width: 800px; margin: 0 auto; font-size: 16px; line-height: 1.6;">
-                RouteVision AI helps traffic managers, city planners, and commuters make better decisions through 
-                real-time data analysis and predictive modeling. Our platform reduces congestion, emissions, and travel times.
+                {home_dashboard_desc}
             </p>
         </div>
-        """,
+        """.format(
+            home_dashboard_preview=lang_mapping[st.session_state.lang]["home_dashboard_preview"],
+            home_dashboard_desc=lang_mapping[st.session_state.lang]["home_dashboard_desc"]
+        ),
         unsafe_allow_html=True
     )
     
@@ -368,9 +437,12 @@ if st.session_state.page == 'home':
     st.markdown(
         """
         <div class="footer">
-            <p style="margin: 0; color: #666; font-size: 13px;">© 2025 RouteVision AI - Transforming Urban Mobility Through Artificial Intelligence</p>
+            <p style="margin: 0; color: #666; font-size: 13px;">{home_footer}</p>
         </div>
-        """,
+        """.format(
+            home_footer=lang_mapping[st.session_state.lang]["home_footer"]
+        )
+        ,
         unsafe_allow_html=True
     )
     
