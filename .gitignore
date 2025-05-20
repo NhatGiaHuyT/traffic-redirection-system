@@ -1,8 +1,39 @@
-# Ignore some folders of AITraffic_Monitoring_Application
-/AITraffic_Monitoring_Application/venv/
-env/
+# Ignore some folders of src
+/src/venv/
+/venv/
+/src/README.md
 
+# Ignore the folder frames_d5, except for the file frames_d5/README.md
+/src/frames_d5/56de42f611f398ec0c48128b
+/src/frames_d5/56de42f611f398ec0c48128c
+/src/frames_d5/56de42f611f398ec0c48128d
+/src/frames_d5/56de42f611f398ec0c48128e
+/src/frames_d5/56de42f611f398ec0c48128f
+/src/frames_d5/56de42f611f398ec0c481290
+/src/frames_d5/56de42f611f398ec0c481291
+/src/frames_d5/56de42f611f398ec0c481295
+/src/frames_d5/56de42f611f398ec0c481297
+/src/frames_d5/5822adbbedeb6c0012a2d65f
+/src/frames_d5/5822f23aedeb6c0012a2d6a8
+/src/frames_d5/5a82439f5058170011f6eaa9
+# /src/frames_d5/5b0b7aba0e517b00119fd800
+/src/frames_d5/5b5995a3fd4edb0019c7d9ab
+/src/frames_d5/5b632950fd4edb0019c7dc07
+/src/frames_d5/5b632a79fd4edb0019c7dc0f
+/src/frames_d5/5b632b60fd4edb0019c7dc12
+/src/frames_d5/5b728aafca0577001163ff7e
+/src/frames_d5/5d8cd1f9766c880017188938
+/src/frames_d5/5d8cd49f766c880017188944
+/src/frames_d5/5deb576d1dc17d7c5515ad1f
+/src/frames_d5/5deb576d1dc17d7c5515ad20
+/src/frames_d5/63ae78ccbfd3d90017e8f1f9
+/src/frames_d5/63b3c274bfd3d90017e9ab93
+/src/frames_d5/662b4de41afb9c00172d85c5
+/src/frames_d5/662b4e201afb9c00172d85f9
+/src/frames_d5/662b4efc1afb9c00172d86bc
+/src/frames_d5/66b1c1bf779f740018673ef2
 
+/src/*.ipynb
 # Ignore video files in AITraffic_Monitoring_Application
 videos/
 /**/*.mp4

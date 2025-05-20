@@ -5,3 +5,11 @@ ultralytics>=8.0.0
 deep_sort_realtime>=1.0.0
 matplotlib>=3.4.0
 scikit-learn>=1.0.0
+streamlit
+folium
+streamlit-folium
+pandas
+requests
+streamlit-lottie
+opencv-python-headless
+plotly

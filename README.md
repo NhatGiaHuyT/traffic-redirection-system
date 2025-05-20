@@ -34,7 +34,7 @@ pip install -r requirements.txt
 - To run the program, execute the following command in your terminal:
 
 ```bash
-(venv) ..\AITraffic_Monitoring_Application> streamlit run HomPage.py
+(venv) > streamlit run .\src\HomePage.py
 ```
 
 # CHANGELOG
