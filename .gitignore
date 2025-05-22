@@ -35,10 +35,13 @@
 
 /src/*.ipynb
 # Ignore video files in AITraffic_Monitoring_Application
-videos/
-/**/*.mp4
-/**/*.avi
-/**/*.mov
+/src/videos/Traffic.mp4
+/src/videos/Traffic3.mp4
+/src/videos/Traffic4.mp4
+/src/videos/vecteezy_ho-chi-minh-city-traffic-at-intersection-vietnam_1806644.mov
+# /**/*.mp4
+# /**/*.avi
+# /**/*.mov
 
 # Ignore build output
 dist/
