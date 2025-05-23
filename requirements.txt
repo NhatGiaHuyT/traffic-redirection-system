@@ -12,4 +12,10 @@ pandas
 requests
 streamlit-lottie
 opencv-python-headless
+flask
+jwt
+bcrypt
+deep-sort-realtime
 plotly
+openrouteservice
+cv2
